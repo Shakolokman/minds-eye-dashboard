@@ -363,7 +363,16 @@ function calculateMetrics(entries, wireTransfers = []) {
   const totalClosed = closedDeals.length;
   const closeRate = closerLiveCalls > 0 ? (totalClosed / closerLiveCalls * 100) : 0;
 
-  const totalRevenue = closedDeals.reduce((s, e) => s + (parseFloat(e.totalDealSize) || 0), 0);
+  const totalRevenue = closedDeals.reduce((s, e) => {
+    const dealSize = parseFloat(e.totalDealSize) || 0;
+    const cash = parseFloat(e.cashCollected) || 0;
+    // For Stripe PIF, deal size = cash collected (auto-pulled from Stripe)
+    if (e.paymentMethod === 'stripe' && e.paymentType === 'pif') return s + cash;
+    // For deals with deal size entered, use it
+    if (dealSize > 0) return s + dealSize;
+    // Fallback to cash collected if no deal size
+    return s + cash;
+  }, 0);
   const totalCashCollected = closedDeals.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
   const wireCash = wireTransfers.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   const totalCashWithWire = totalCashCollected + wireCash;
@@ -371,8 +380,8 @@ function calculateMetrics(entries, wireTransfers = []) {
   const avgRevPerClose = totalClosed > 0 ? totalRevenue / totalClosed : 0;
   const cashToRevPercent = totalRevenue > 0 ? (totalCashWithWire / totalRevenue * 100) : 0;
 
-  const pifDeals = closedDeals.filter(e => (e.paymentDetails || '').toLowerCase().includes('pif')).length;
-  const splitDeals = closedDeals.filter(e => (e.paymentDetails || '').toLowerCase().includes('split')).length;
+  const pifDeals = closedDeals.filter(e => e.paymentType === 'pif' || (e.paymentDetails || '').toLowerCase().includes('pif')).length;
+  const splitDeals = closedDeals.filter(e => e.paymentType === 'split' || (e.paymentDetails || '').toLowerCase().includes('split')).length;
   const depositDeals = closedDeals.filter(e => (e.paymentDetails || '').toLowerCase().includes('deposit')).length;
 
   const totalConversations = totalOutbounds + totalInbounds;

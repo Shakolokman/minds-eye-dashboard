@@ -235,6 +235,7 @@ export default function Dashboard() {
         <StatCard label="Links Sent" value={fmt(metrics.totalLinksSent)} icon="🔗" kpiColor={kc.links} target={Math.round(kpi.linksSent)} />
         <StatCard label="Total Booked" value={fmt(metrics.totalBookedCalls)} icon="📅" kpiColor={kc.booked} target={Math.round(kpi.totalBooked)} subtitle={`${metrics.setterBookedTC} TC · ${metrics.setterBookedSC} SC`} />
         <StatCard label="DM→Link CR" value={fmtPct(metrics.dmToLinkCR)} icon="📊" />
+        <StatCard label="Link→Booked CR" value={fmtPct(metrics.linkToBookedCR)} icon="📊" />
       </div>
 
       {/* Charts Row */}

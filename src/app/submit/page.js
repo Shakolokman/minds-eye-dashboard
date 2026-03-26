@@ -53,7 +53,7 @@ export default function SubmitPage() {
     qualifiedConvos: '', pitchedCalls: '', bookingLinksSent: '', bookedTC: '', bookedSC: '', notes: '',
     // Triage
     leadName: '', leadEmail: '', showUp: '', qualified: '', bookedForSC: '',
-    leadQuality: 0, callNotes: '', callRecording: '',
+    leadQuality: 0, callRecording: '', ghlUpdated: false,
     // Closer
     closed: '', totalDealSize: '', cashCollected: '', paymentMethod: '', paymentType: '', paymentDetails: '',
     discoveryRating: 0, pitchRating: 0, objectionRating: 0, performanceNotes: '',
@@ -79,7 +79,7 @@ export default function SubmitPage() {
         outbounds: '', inbounds: '', followUpsFirst: '', followUpsInConvo: '', replies: '',
         qualifiedConvos: '', pitchedCalls: '', bookingLinksSent: '', bookedTC: '', bookedSC: '', notes: '',
         leadName: '', leadEmail: '', showUp: '', qualified: '', bookedForSC: '',
-        leadQuality: 0, callNotes: '', callRecording: '',
+        leadQuality: 0, callRecording: '', ghlUpdated: false,
         closed: '', totalDealSize: '', cashCollected: '', paymentMethod: '', paymentType: '', paymentDetails: '',
         discoveryRating: 0, pitchRating: 0, objectionRating: 0, performanceNotes: '',
       }));
@@ -208,7 +208,14 @@ export default function SubmitPage() {
                     <StarRating label="Lead Quality" value={form.leadQuality} onChange={v => updateForm('leadQuality', v)} low="DQ" high="Super qualified" />
                   </>
                 )}
-                <Field label="Quick explanation of the call"><textarea className="input-field min-h-[80px]" value={form.callNotes} onChange={e => updateForm('callNotes', e.target.value)} /></Field>
+                <div className="flex items-start gap-3 p-3 bg-brand-darker rounded-lg border border-brand-slate/20">
+                  <input type="checkbox" checked={form.ghlUpdated} onChange={e => updateForm('ghlUpdated', e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-brand-slate/50 accent-brand-gold" />
+                  <div>
+                    <p className="text-sm text-white font-medium">I submitted call notes in GHL and moved the lead to the relevant pipeline stage</p>
+                    <p className="text-xs text-brand-muted mt-0.5">Confirm you've updated GoHighLevel before submitting.</p>
+                  </div>
+                </div>
                 <Field label="Call Recording Link"><input className="input-field" value={form.callRecording} onChange={e => updateForm('callRecording', e.target.value)} placeholder="https://..." /></Field>
               </>
             )}
@@ -278,7 +285,14 @@ export default function SubmitPage() {
                       </>
                     )}
                     <StarRating label="Lead Quality" value={form.leadQuality} onChange={v => updateForm('leadQuality', v)} />
-                    <Field label="General notes from the call"><textarea className="input-field min-h-[80px]" value={form.callNotes} onChange={e => updateForm('callNotes', e.target.value)} /></Field>
+                    <div className="flex items-start gap-3 p-3 bg-brand-darker rounded-lg border border-brand-slate/20">
+                      <input type="checkbox" checked={form.ghlUpdated} onChange={e => updateForm('ghlUpdated', e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded border-brand-slate/50 accent-brand-gold" />
+                      <div>
+                        <p className="text-sm text-white font-medium">I submitted call notes in GHL and moved the lead to the relevant pipeline stage</p>
+                        <p className="text-xs text-brand-muted mt-0.5">Confirm you've updated GoHighLevel before submitting.</p>
+                      </div>
+                    </div>
                     <StarRating label="Rate your Discovery" value={form.discoveryRating} onChange={v => updateForm('discoveryRating', v)} />
                     <StarRating label="Rate your Pitch" value={form.pitchRating} onChange={v => updateForm('pitchRating', v)} />
                     <StarRating label="Rate your Objection Handling" value={form.objectionRating} onChange={v => updateForm('objectionRating', v)} />
