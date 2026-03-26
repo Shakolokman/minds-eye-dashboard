@@ -149,7 +149,7 @@ export default function EntriesPage() {
   const [mounted, setMounted] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState(null);
 
-  useEffect(() => { setTeam(getTeam()); setEntries(getEntries()); setMounted(true); }, []);
+  useEffect(() => { async function load() { setTeam(await getTeam()); setEntries(await getEntries()); setMounted(true); } load(); }, []);
 
   const filtered = useMemo(() => {
     if (!mounted) return [];
@@ -165,8 +165,8 @@ export default function EntriesPage() {
     return result;
   }, [mounted, entries, preset, customStart, customEnd, filterRole, filterMember]);
 
-  const handleDelete = (id) => {
-    if (confirm('Delete this entry?')) { deleteEntry(id); setEntries(getEntries()); setSelectedEntry(null); }
+  const handleDelete = async (id) => {
+    if (confirm('Delete this entry?')) { await deleteEntry(id); setEntries(await getEntries()); setSelectedEntry(null); }
   };
 
   if (!mounted) return <div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-2 border-brand-gold border-t-transparent rounded-full animate-spin" /></div>;

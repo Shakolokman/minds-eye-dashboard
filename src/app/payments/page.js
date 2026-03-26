@@ -17,7 +17,7 @@ export default function PaymentsPage() {
   const [showWireForm, setShowWireForm] = useState(false);
   const [wireForm, setWireForm] = useState({ date: new Date().toISOString().split('T')[0], clientName: '', amount: '', collectedBy: '', notes: '' });
 
-  useEffect(() => { setTeam(getTeam()); setEntries(getEntries()); setWires(getWireTransfers()); setMounted(true); }, []);
+  useEffect(() => { async function load() { setTeam(await getTeam()); setEntries(await getEntries()); setWires(await getWireTransfers()); setMounted(true); } load(); }, []);
 
   const { filteredEntries, filteredWires } = useMemo(() => {
     if (!mounted) return { filteredEntries: [], filteredWires: [] };
@@ -42,10 +42,10 @@ export default function PaymentsPage() {
     ...filteredWires.map(w => ({ type: 'wire', date: w.date, client: w.clientName, amount: parseFloat(w.amount) || 0, deal: 0, method: 'Wire Transfer', details: w.notes, closer: w.collectedBy })),
   ].sort((a, b) => b.date.localeCompare(a.date));
 
-  const handleWireSubmit = (e) => {
+  const handleWireSubmit = async (e) => {
     e.preventDefault();
-    addWireTransfer(wireForm);
-    setWires(getWireTransfers());
+    await addWireTransfer(wireForm);
+    setWires(await getWireTransfers());
     setWireForm({ date: new Date().toISOString().split('T')[0], clientName: '', amount: '', collectedBy: '', notes: '' });
     setShowWireForm(false);
   };

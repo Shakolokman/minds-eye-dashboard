@@ -1,6 +1,8 @@
 'use client';
 
-// Default team members
+import { supabase } from './supabase';
+
+// Default team members (fallback if Supabase is unavailable)
 const DEFAULT_TEAM = [
   { id: '1', name: 'Shako Lokman', email: 'shako@mindseyestatus.com', role: 'closer', color: '#E1C36E' },
   { id: '2', name: 'Martin Mezei', email: 'martin@mindseyestatus.com', role: 'closer', color: '#6EE1A8' },
@@ -30,18 +32,16 @@ const WEEKLY_KPIS = {
   pitchedCalls: 50,
   linksSent: 30,
   totalBooked: 20,
-  showUpRate: 80,       // percentage
-  closeRate: 30,        // percentage
-  replyRate: 30,        // percentage
+  showUpRate: 80,
+  closeRate: 30,
+  replyRate: 30,
   revenue: 25000,
 };
 
-// Daily = weekly / 5
 const DAILY_KPIS = Object.fromEntries(
   Object.entries(WEEKLY_KPIS).map(([k, v]) => [k, v / 5])
 );
 
-// Returns 'green' | 'lightgreen' | 'orange' | 'red' | null
 function getKpiColor(actual, target) {
   if (target === 0 || target === undefined || target === null) return null;
   const pct = (actual / target) * 100;
@@ -65,89 +65,199 @@ const KPI_TEXT = {
   red: 'text-red-400',
 };
 
-function getStorage(key, fallback) {
-  if (typeof window === 'undefined') return fallback;
+const MEMBER_COLORS = ['#E1C36E', '#6EE1A8', '#A86EE1', '#E16E8A', '#6EA8E1', '#E1A86E', '#6EE1D8', '#D86EE1'];
+
+// ============ SUPABASE ASYNC FUNCTIONS ============
+
+// Team Management
+async function getTeam() {
+  if (!supabase) return DEFAULT_TEAM;
   try {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : fallback;
-  } catch {
-    return fallback;
+    const { data, error } = await supabase
+      .from('team_members')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return data || DEFAULT_TEAM;
+  } catch (err) {
+    console.error('getTeam error:', err);
+    return DEFAULT_TEAM;
   }
 }
 
-function setStorage(key, value) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(key, JSON.stringify(value));
+async function saveTeam(team) {
+  // With Supabase we use individual add/remove/update operations
 }
 
-// Team Management
-function getTeam() {
-  return getStorage('me_team', DEFAULT_TEAM);
+async function addTeamMember(member) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('team_members')
+      .insert({
+        name: member.name,
+        email: member.email,
+        role: member.role,
+        color: MEMBER_COLORS[Math.floor(Math.random() * MEMBER_COLORS.length)],
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.error('addTeamMember error:', err);
+    return null;
+  }
 }
 
-function saveTeam(team) {
-  setStorage('me_team', team);
+async function removeTeamMember(id) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('team_members')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('removeTeamMember error:', err);
+  }
 }
 
-function addTeamMember(member) {
-  const team = getTeam();
-  const newMember = {
-    id: Date.now().toString(),
-    ...member,
-    color: MEMBER_COLORS[team.length % MEMBER_COLORS.length],
-  };
-  team.push(newMember);
-  saveTeam(team);
-  return newMember;
+async function updateTeamMemberRole(id, role) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('team_members')
+      .update({ role })
+      .eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('updateTeamMemberRole error:', err);
+  }
 }
-
-function removeTeamMember(id) {
-  const team = getTeam().filter(m => m.id !== id);
-  saveTeam(team);
-}
-
-const MEMBER_COLORS = ['#E1C36E', '#6EE1A8', '#A86EE1', '#E16E8A', '#6EA8E1', '#E1A86E', '#6EE1D8', '#D86EE1'];
 
 // Entries Management
-function getEntries() {
-  return getStorage('me_entries', []);
+async function getEntries() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('entries')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    // Flatten: merge the JSONB data column into the top-level object
+    return (data || []).map(row => ({
+      id: row.id,
+      memberId: row.member_id,
+      formType: row.form_type,
+      date: row.date,
+      timestamp: row.created_at,
+      ...(row.data || {}),
+    }));
+  } catch (err) {
+    console.error('getEntries error:', err);
+    return [];
+  }
 }
 
-function addEntry(entry) {
-  const entries = getEntries();
-  const newEntry = {
-    id: Date.now().toString(),
-    timestamp: new Date().toISOString(),
-    ...entry,
-  };
-  entries.unshift(newEntry);
-  setStorage('me_entries', entries);
-  return newEntry;
+async function addEntry(entry) {
+  if (!supabase) return null;
+  try {
+    const { memberId, formType, date, ...formData } = entry;
+    const { data, error } = await supabase
+      .from('entries')
+      .insert({
+        member_id: memberId,
+        form_type: formType,
+        date: date,
+        data: formData,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return {
+      id: data.id,
+      memberId: data.member_id,
+      formType: data.form_type,
+      date: data.date,
+      timestamp: data.created_at,
+      ...(data.data || {}),
+    };
+  } catch (err) {
+    console.error('addEntry error:', err);
+    return null;
+  }
 }
 
-function deleteEntry(id) {
-  const entries = getEntries().filter(e => e.id !== id);
-  setStorage('me_entries', entries);
+async function deleteEntry(id) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('entries')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('deleteEntry error:', err);
+  }
 }
 
 // Wire Transfers
-function getWireTransfers() {
-  return getStorage('me_wire_transfers', []);
+async function getWireTransfers() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('wire_transfers')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(row => ({
+      id: row.id,
+      date: row.date,
+      clientName: row.client_name,
+      amount: row.amount,
+      collectedBy: row.collected_by,
+      notes: row.notes,
+      timestamp: row.created_at,
+    }));
+  } catch (err) {
+    console.error('getWireTransfers error:', err);
+    return [];
+  }
 }
 
-function addWireTransfer(transfer) {
-  const transfers = getWireTransfers();
-  const newTransfer = {
-    id: Date.now().toString(),
-    timestamp: new Date().toISOString(),
-    ...transfer,
-  };
-  transfers.unshift(newTransfer);
-  setStorage('me_wire_transfers', transfers);
-  return newTransfer;
+async function addWireTransfer(transfer) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('wire_transfers')
+      .insert({
+        date: transfer.date,
+        client_name: transfer.clientName,
+        amount: parseFloat(transfer.amount) || 0,
+        collected_by: transfer.collectedBy,
+        notes: transfer.notes || '',
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return {
+      id: data.id,
+      date: data.date,
+      clientName: data.client_name,
+      amount: data.amount,
+      collectedBy: data.collected_by,
+      notes: data.notes,
+      timestamp: data.created_at,
+    };
+  } catch (err) {
+    console.error('addWireTransfer error:', err);
+    return null;
+  }
 }
 
-// Filtering
+// ============ FILTERING (unchanged) ============
+
 function filterByDateRange(items, startDate, endDate, dateField = 'date') {
   return items.filter(item => {
     const d = new Date(item[dateField]);
@@ -186,11 +296,12 @@ function getDateRange(preset) {
   return { start, end };
 }
 
-// Calculate Metrics
+// ============ METRICS CALCULATION (unchanged) ============
+
 function calculateMetrics(entries, wireTransfers = []) {
   const setterEntries = entries.filter(e => e.formType === 'setter');
   const outboundEntries = entries.filter(e => e.formType === 'outbound');
-  const triageEntries = entries.filter(e => e.formType === 'triage');
+  const triageEntries = entries.filter(e => e.formType === 'triage' || e.formType === 'triager');
   const closerEntries = entries.filter(e => e.formType === 'closer');
 
   const totalOutbounds = [...setterEntries, ...outboundEntries].reduce((s, e) => s + (parseInt(e.outbounds) || 0), 0);
@@ -205,7 +316,6 @@ function calculateMetrics(entries, wireTransfers = []) {
   const setterBookedSC = setterEntries.reduce((s, e) => s + (parseInt(e.bookedSC) || 0), 0);
   const totalBookedCalls = setterBookedTC + setterBookedSC;
 
-  // Triage
   const triageLiveCalls = triageEntries.filter(e => e.showUp === 'live').length;
   const triageNoShows = triageEntries.filter(e => e.showUp === 'noshow').length;
   const triageOnCalendar = triageEntries.length;
@@ -213,7 +323,6 @@ function calculateMetrics(entries, wireTransfers = []) {
   const triageQualified = triageEntries.filter(e => e.qualified === 'yes').length;
   const triageBookedSC = triageEntries.filter(e => e.bookedForSC === 'yes').length;
 
-  // Closer
   const closerLiveCalls = closerEntries.filter(e => e.showUp === 'live').length;
   const closerNoShows = closerEntries.filter(e => e.showUp === 'noshow').length;
   const closerOnCalendar = closerEntries.length;
@@ -259,7 +368,7 @@ function calculateMetrics(entries, wireTransfers = []) {
 export {
   DEFAULT_TEAM, ROLE_LABELS, ROLE_COLORS, MEMBER_COLORS,
   WEEKLY_KPIS, DAILY_KPIS, getKpiColor, KPI_BG, KPI_TEXT,
-  getTeam, saveTeam, addTeamMember, removeTeamMember,
+  getTeam, saveTeam, addTeamMember, removeTeamMember, updateTeamMemberRole,
   getEntries, addEntry, deleteEntry,
   getWireTransfers, addWireTransfer,
   filterByDateRange, getDateRange, calculateMetrics,

@@ -59,17 +59,17 @@ export default function SubmitPage() {
     discoveryRating: 0, pitchRating: 0, objectionRating: 0, performanceNotes: '',
   });
 
-  useEffect(() => { setTeam(getTeam()); setMounted(true); }, []);
+  useEffect(() => { async function load() { setTeam(await getTeam()); setMounted(true); } load(); }, []);
 
   const member = team.find(m => m.id === selectedMember);
   const role = member?.role;
 
   const updateForm = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedMember) return;
-    addEntry({ ...form, memberId: selectedMember, formType: role });
+    await addEntry({ ...form, memberId: selectedMember, formType: role });
     setSubmitted(true);
     setTimeout(() => {
       setSubmitted(false);

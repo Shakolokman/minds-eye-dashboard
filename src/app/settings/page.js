@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { getTeam, saveTeam, ROLE_LABELS, ROLE_COLORS, MEMBER_COLORS } from '@/lib/store';
+import { getTeam, addTeamMember, removeTeamMember, updateTeamMemberRole, ROLE_LABELS, ROLE_COLORS, MEMBER_COLORS } from '@/lib/store';
 
 export default function SettingsPage() {
   const [team, setTeam] = useState([]);
@@ -9,32 +9,36 @@ export default function SettingsPage() {
   const [newMember, setNewMember] = useState({ name: '', email: '', role: 'setter' });
   const [editId, setEditId] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => { setTeam(getTeam()); setMounted(true); }, []);
+  useEffect(() => { async function load() { setTeam(await getTeam()); setMounted(true); } load(); }, []);
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
-    const updated = [...team, { id: Date.now().toString(), ...newMember, color: MEMBER_COLORS[team.length % MEMBER_COLORS.length] }];
-    saveTeam(updated);
-    setTeam(updated);
+    setLoading(true);
+    await addTeamMember(newMember);
+    setTeam(await getTeam());
     setNewMember({ name: '', email: '', role: 'setter' });
     setShowAdd(false);
+    setLoading(false);
     flashSaved();
   };
 
-  const handleRemove = (id) => {
+  const handleRemove = async (id) => {
     if (!confirm('Remove this team member? Their past entries will be kept.')) return;
-    const updated = team.filter(m => m.id !== id);
-    saveTeam(updated);
-    setTeam(updated);
+    setLoading(true);
+    await removeTeamMember(id);
+    setTeam(await getTeam());
+    setLoading(false);
     flashSaved();
   };
 
-  const handleRoleChange = (id, role) => {
-    const updated = team.map(m => m.id === id ? { ...m, role } : m);
-    saveTeam(updated);
-    setTeam(updated);
+  const handleRoleChange = async (id, role) => {
+    setLoading(true);
+    await updateTeamMemberRole(id, role);
+    setTeam(await getTeam());
     setEditId(null);
+    setLoading(false);
     flashSaved();
   };
 
@@ -88,7 +92,7 @@ export default function SettingsPage() {
                   <option value="closer">Closer</option>
                 </select>
               </div>
-              <button type="submit" className="btn-gold text-sm">Add</button>
+              <button type="submit" className="btn-gold text-sm" disabled={loading}>{loading ? 'Saving...' : 'Add'}</button>
               <button type="button" onClick={() => setShowAdd(false)} className="btn-outline text-sm">Cancel</button>
             </form>
           </div>
@@ -146,6 +150,14 @@ export default function SettingsPage() {
       <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
         <h3 className="text-sm font-semibold text-white mb-4">Integrations</h3>
         <div className="space-y-3">
+          <div className="flex items-center gap-3 p-3 bg-brand-darker rounded-lg border border-brand-slate/20">
+            <span className="text-lg">🗄️</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-white">Supabase Database</p>
+              <p className="text-xs text-brand-muted">Shared database for all team members</p>
+            </div>
+            <span className="text-xs px-2 py-1 rounded-full bg-emerald-900/30 text-emerald-400 border border-emerald-600/30">Connected</span>
+          </div>
           <div className="flex items-center gap-3 p-3 bg-brand-darker rounded-lg border border-brand-slate/20">
             <span className="text-lg">💳</span>
             <div className="flex-1">
