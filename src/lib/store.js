@@ -256,6 +256,35 @@ async function addWireTransfer(transfer) {
   }
 }
 
+// Stripe Payments (read-only — populated by webhook)
+async function getStripePayments() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('stripe_payments')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data || []).map(row => ({
+      id: row.id,
+      stripePaymentId: row.stripe_payment_id,
+      customerName: row.customer_name,
+      customerEmail: row.customer_email,
+      amount: row.amount,
+      currency: row.currency,
+      paymentType: row.payment_type,
+      planName: row.plan_name,
+      status: row.status,
+      stripeEvent: row.stripe_event,
+      date: row.created_at?.split('T')[0],
+      timestamp: row.created_at,
+    }));
+  } catch (err) {
+    console.error('getStripePayments error:', err);
+    return [];
+  }
+}
+
 // ============ FILTERING (unchanged) ============
 
 function filterByDateRange(items, startDate, endDate, dateField = 'date') {
@@ -374,5 +403,6 @@ export {
   getTeam, saveTeam, addTeamMember, removeTeamMember, updateTeamMemberRole,
   getEntries, addEntry, deleteEntry,
   getWireTransfers, addWireTransfer,
+  getStripePayments,
   filterByDateRange, getDateRange, calculateMetrics,
 };
