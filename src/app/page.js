@@ -48,6 +48,16 @@ export default function Dashboard() {
   const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires), [filteredEntries, filteredWires]);
 
   // Calculate KPI targets scaled to the selected date range
+  // Daily targets (weekly ÷ 5 work days)
+  const DAILY = {
+    totalOutbounds: 200,
+    followUpsInConvo: 100,
+    pitchedCalls: 10,
+    linksSent: 6,
+    totalBooked: 4,
+    revenue: 5000,
+  };
+
   const kpi = useMemo(() => {
     if (!mounted) return {};
     let start, end;
@@ -58,21 +68,28 @@ export default function Dashboard() {
       const range = getDateRange(preset);
       start = range.start; end = range.end;
     }
-    const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
-    const weeks = days / 7;
-    // Scale weekly KPIs to the number of days in range
-    const scale = (weeklyTarget) => weeklyTarget * weeks;
+    const totalDays = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    // Count work days (Mon-Fri) in the range
+    let workDays = 0;
+    const d = new Date(start);
+    while (d <= end) {
+      const day = d.getDay();
+      if (day !== 0 && day !== 6) workDays++;
+      d.setDate(d.getDate() + 1);
+    }
+    workDays = Math.max(1, workDays);
+
     return {
-      totalOutbounds: scale(WEEKLY_KPIS.totalOutbounds),
-      followUpsInConvo: scale(WEEKLY_KPIS.followUpsInConvo),
-      pitchedCalls: scale(WEEKLY_KPIS.pitchedCalls),
-      linksSent: scale(WEEKLY_KPIS.linksSent),
-      totalBooked: scale(WEEKLY_KPIS.totalBooked),
-      revenue: scale(WEEKLY_KPIS.revenue),
+      totalOutbounds: DAILY.totalOutbounds * workDays,
+      followUpsInConvo: DAILY.followUpsInConvo * workDays,
+      pitchedCalls: DAILY.pitchedCalls * workDays,
+      linksSent: DAILY.linksSent * workDays,
+      totalBooked: DAILY.totalBooked * workDays,
+      revenue: DAILY.revenue * workDays,
       // Rate-based KPIs don't scale
-      showUpRate: WEEKLY_KPIS.showUpRate,
-      closeRate: WEEKLY_KPIS.closeRate,
-      replyRate: WEEKLY_KPIS.replyRate,
+      showUpRate: 80,
+      closeRate: 30,
+      replyRate: 30,
     };
   }, [mounted, preset, customStart, customEnd]);
 
