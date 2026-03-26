@@ -159,7 +159,9 @@ function calculateMetrics(entries, wireTransfers = []) {
   const totalQualified = setterEntries.reduce((s, e) => s + (parseInt(e.qualifiedConvos) || 0), 0);
   const totalPitched = setterEntries.reduce((s, e) => s + (parseInt(e.pitchedCalls) || 0), 0);
   const totalLinksSent = setterEntries.reduce((s, e) => s + (parseInt(e.bookingLinksSent) || 0), 0);
-  const totalBookedCalls = setterEntries.reduce((s, e) => s + (parseInt(e.bookedCalls) || 0), 0);
+  const setterBookedTC = setterEntries.reduce((s, e) => s + (parseInt(e.bookedTC) || 0), 0);
+  const setterBookedSC = setterEntries.reduce((s, e) => s + (parseInt(e.bookedSC) || 0), 0);
+  const totalBookedCalls = setterBookedTC + setterBookedSC;
 
   // Triage
   const triageLiveCalls = triageEntries.filter(e => e.showUp === 'live').length;
@@ -197,7 +199,7 @@ function calculateMetrics(entries, wireTransfers = []) {
 
   return {
     totalOutbounds, totalInbounds, totalReplies, totalFollowUpsFirst, totalFollowUpsInConvo,
-    totalQualified, totalPitched, totalLinksSent, totalBookedCalls, totalConversations,
+    totalQualified, totalPitched, totalLinksSent, totalBookedCalls, setterBookedTC, setterBookedSC, totalConversations,
     triageOnCalendar, triageLiveCalls, triageNoShows, triageShowUpRate, triageQualified, triageBookedSC,
     closerOnCalendar, closerLiveCalls, closerNoShows, closerShowUpRate,
     totalClosed, closeRate, totalRevenue, totalCashCollected, wireCash, totalCashWithWire,

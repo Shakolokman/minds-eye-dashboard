@@ -50,7 +50,7 @@ export default function SubmitPage() {
     date: new Date().toISOString().split('T')[0],
     winOfDay: '', hoursWorked: '', timeManagement: 0, performance: 0, analyzeDay: '',
     outbounds: '', inbounds: '', followUpsFirst: '', followUpsInConvo: '', replies: '',
-    qualifiedConvos: '', pitchedCalls: '', bookingLinksSent: '', bookedCalls: '', notes: '',
+    qualifiedConvos: '', pitchedCalls: '', bookingLinksSent: '', bookedTC: '', bookedSC: '', notes: '',
     // Triage
     leadName: '', leadEmail: '', showUp: '', qualified: '', bookedForSC: '',
     leadQuality: 0, callNotes: '', callRecording: '',
@@ -77,7 +77,7 @@ export default function SubmitPage() {
         ...prev, date: new Date().toISOString().split('T')[0],
         winOfDay: '', hoursWorked: '', timeManagement: 0, performance: 0, analyzeDay: '',
         outbounds: '', inbounds: '', followUpsFirst: '', followUpsInConvo: '', replies: '',
-        qualifiedConvos: '', pitchedCalls: '', bookingLinksSent: '', bookedCalls: '', notes: '',
+        qualifiedConvos: '', pitchedCalls: '', bookingLinksSent: '', bookedTC: '', bookedSC: '', notes: '',
         leadName: '', leadEmail: '', showUp: '', qualified: '', bookedForSC: '',
         leadQuality: 0, callNotes: '', callRecording: '',
         closed: '', totalDealSize: '', cashCollected: '', paymentDetails: '',
@@ -170,7 +170,8 @@ export default function SubmitPage() {
                   <Field label="Qualified Convos" required><input type="number" className="input-field" value={form.qualifiedConvos} onChange={e => updateForm('qualifiedConvos', e.target.value)} required /></Field>
                   <Field label="Pitched Calls" required><input type="number" className="input-field" value={form.pitchedCalls} onChange={e => updateForm('pitchedCalls', e.target.value)} required /></Field>
                   <Field label="Booking Links Sent" required><input type="number" className="input-field" value={form.bookingLinksSent} onChange={e => updateForm('bookingLinksSent', e.target.value)} required /></Field>
-                  <Field label="Booked Calls" required><input type="number" className="input-field" value={form.bookedCalls} onChange={e => updateForm('bookedCalls', e.target.value)} required /></Field>
+                  <Field label="Triage Calls Booked" required><input type="number" className="input-field" value={form.bookedTC} onChange={e => updateForm('bookedTC', e.target.value)} required /></Field>
+                  <Field label="Sales Calls Booked" required><input type="number" className="input-field" value={form.bookedSC} onChange={e => updateForm('bookedSC', e.target.value)} required /></Field>
                 </div>
                 <Field label="Notes"><textarea className="input-field min-h-[60px]" value={form.notes} onChange={e => updateForm('notes', e.target.value)} /></Field>
               </>

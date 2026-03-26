@@ -52,9 +52,9 @@ export default function Dashboard() {
     { name: 'Outbounds', value: metrics.totalOutbounds, fill: '#6EA8E1' },
     { name: 'Replies', value: metrics.totalReplies, fill: '#A86EE1' },
     { name: 'Qualified', value: metrics.totalQualified, fill: '#6EE1A8' },
-    { name: 'Booked TC', value: metrics.totalBookedCalls, fill: '#E1C36E' },
+    { name: 'TC Booked', value: metrics.setterBookedTC, fill: '#E1C36E' },
     { name: 'Held TC', value: metrics.triageLiveCalls, fill: '#E1A86E' },
-    { name: 'Booked SC', value: metrics.triageBookedSC, fill: '#E16E8A' },
+    { name: 'SC Booked', value: metrics.triageBookedSC + metrics.setterBookedSC, fill: '#E16E8A' },
     { name: 'Held SC', value: metrics.closerLiveCalls, fill: '#D86EE1' },
     { name: 'Closed', value: metrics.totalClosed, fill: '#E1C36E' },
   ];
@@ -170,7 +170,9 @@ export default function Dashboard() {
         <StatCard label="Qualified Convos" value={fmt(metrics.totalQualified)} icon="✅" />
         <StatCard label="Pitched Calls" value={fmt(metrics.totalPitched)} icon="📞" />
         <StatCard label="Links Sent" value={fmt(metrics.totalLinksSent)} icon="🔗" />
-        <StatCard label="Booked TC" value={fmt(metrics.totalBookedCalls)} highlight icon="📅" />
+        <StatCard label="TC Booked" value={fmt(metrics.setterBookedTC)} highlight icon="📅" />
+        <StatCard label="SC Booked (direct)" value={fmt(metrics.setterBookedSC)} highlight icon="🎯" />
+        <StatCard label="Total Booked" value={fmt(metrics.totalBookedCalls)} icon="📊" subtitle="TC + SC combined" />
         <StatCard label="DM→Link CR" value={fmtPct(metrics.dmToLinkCR)} icon="📊" />
       </div>
 
@@ -274,7 +276,8 @@ export default function Dashboard() {
               const fuc = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsInConvo) || 0), 0);
               const qual = memberEntries.reduce((s, e) => s + (parseInt(e.qualifiedConvos) || 0), 0);
               const links = memberEntries.reduce((s, e) => s + (parseInt(e.bookingLinksSent) || 0), 0);
-              const booked = memberEntries.reduce((s, e) => s + (parseInt(e.bookedCalls) || 0), 0);
+              const btc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedTC) || 0), 0);
+              const bsc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedSC) || 0), 0);
               const daysWorked = memberEntries.length;
               return (
                 <div key={member.id} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
@@ -288,10 +291,10 @@ export default function Dashboard() {
                   <div className="grid grid-cols-3 gap-2">
                     <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Outbounds</p><p className="text-lg font-bold text-white">{out}</p></div>
                     <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Replies</p><p className="text-lg font-bold text-white">{rep}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Booked</p><p className="text-lg font-bold text-brand-gold">{booked}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (1st)</p><p className="text-lg font-bold text-white">{fu1}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (Convo)</p><p className="text-lg font-bold text-white">{fuc}</p></div>
                     <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Links Sent</p><p className="text-lg font-bold text-white">{links}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (1st)</p><p className="text-lg font-bold text-white">{fu1}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC Booked</p><p className="text-lg font-bold text-brand-gold">{btc}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bsc}</p></div>
                   </div>
                 </div>
               );
@@ -424,7 +427,7 @@ export default function Dashboard() {
                       </td>
                       <td className="py-3 px-3 text-brand-muted">{new Date(entry.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</td>
                       <td className="py-3 px-3 text-brand-muted text-xs">
-                        {entry.formType === 'setter' && `${entry.outbounds} out · ${entry.replies} replies · ${entry.bookedCalls} booked`}
+                        {entry.formType === 'setter' && `${entry.outbounds} out · ${entry.replies} rep · ${entry.bookedTC || 0} TC · ${entry.bookedSC || 0} SC`}
                         {entry.formType === 'outbound' && `${entry.outbounds} out · ${entry.followUpsFirst} FU`}
                         {entry.formType === 'triage' && `${entry.showUp === 'live' ? '✅ Live' : '❌ No Show'} · ${entry.qualified === 'yes' ? 'Qualified' : 'Not Qual.'}`}
                         {entry.formType === 'closer' && `${entry.showUp === 'live' ? '✅' : '❌'} ${entry.closed === 'yes' ? `Closed ${fmtUSD(parseFloat(entry.totalDealSize))}` : 'No close'}`}
