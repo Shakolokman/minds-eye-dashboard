@@ -13,7 +13,7 @@ const ROLE_LABELS = {
   closer: 'Closer',
   setter: 'DM Setter',
   triager: 'Triager',
-  outbound: 'Outbound',
+  outbound: 'Outbound VA',
 };
 
 const ROLE_COLORS = {

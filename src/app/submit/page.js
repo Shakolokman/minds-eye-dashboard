@@ -180,6 +180,9 @@ export default function SubmitPage() {
             {role === 'outbound' && (
               <>
                 <Field label="Win of the Day 🏆"><input className="input-field" value={form.winOfDay} onChange={e => updateForm('winOfDay', e.target.value)} /></Field>
+                <Field label="Hours Worked" required>
+                  <input className="input-field" value={form.hoursWorked} onChange={e => updateForm('hoursWorked', e.target.value)} placeholder="e.g. 3pm - 11pm" required />
+                </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="Outbounds" required><input type="number" className="input-field" value={form.outbounds} onChange={e => updateForm('outbounds', e.target.value)} required /></Field>
                   <Field label="Follow Ups (1st msg)" required><input type="number" className="input-field" value={form.followUpsFirst} onChange={e => updateForm('followUpsFirst', e.target.value)} required /></Field>
@@ -224,7 +227,10 @@ export default function SubmitPage() {
                       <>
                         <div className="grid grid-cols-2 gap-3">
                           <Field label="Total Deal Size" required><input type="number" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$" required /></Field>
-                          <Field label="Cash Collected" required><input type="number" className="input-field" value={form.cashCollected} onChange={e => updateForm('cashCollected', e.target.value)} placeholder="$" required /></Field>
+                          <Field label="Cash Collected on Call" required>
+                            <input type="number" className="input-field" value={form.cashCollected} onChange={e => updateForm('cashCollected', e.target.value)} placeholder="$" required />
+                            <p className="text-xs text-brand-muted mt-1">Initial payment collected. Stripe will track recurring payments separately.</p>
+                          </Field>
                         </div>
                         <Field label="Payment Details (PIF / deposit / split pay)" required>
                           <textarea className="input-field min-h-[60px]" value={form.paymentDetails} onChange={e => updateForm('paymentDetails', e.target.value)} placeholder='e.g. PIF or "$2000 × 3 every 30 days"' required />
@@ -232,18 +238,14 @@ export default function SubmitPage() {
                       </>
                     )}
                     <StarRating label="Lead Quality" value={form.leadQuality} onChange={v => updateForm('leadQuality', v)} />
-                  </>
-                )}
-                <Field label="General notes from the call"><textarea className="input-field min-h-[80px]" value={form.callNotes} onChange={e => updateForm('callNotes', e.target.value)} /></Field>
-                {form.showUp === 'live' && (
-                  <>
+                    <Field label="General notes from the call"><textarea className="input-field min-h-[80px]" value={form.callNotes} onChange={e => updateForm('callNotes', e.target.value)} /></Field>
                     <StarRating label="Rate your Discovery" value={form.discoveryRating} onChange={v => updateForm('discoveryRating', v)} />
                     <StarRating label="Rate your Pitch" value={form.pitchRating} onChange={v => updateForm('pitchRating', v)} />
                     <StarRating label="Rate your Objection Handling" value={form.objectionRating} onChange={v => updateForm('objectionRating', v)} />
+                    <Field label="Performance notes"><textarea className="input-field min-h-[60px]" value={form.performanceNotes} onChange={e => updateForm('performanceNotes', e.target.value)} placeholder="What went well? What to improve?" /></Field>
+                    <Field label="Call Recording Link"><input className="input-field" value={form.callRecording} onChange={e => updateForm('callRecording', e.target.value)} placeholder="https://..." /></Field>
                   </>
                 )}
-                <Field label="Performance notes"><textarea className="input-field min-h-[60px]" value={form.performanceNotes} onChange={e => updateForm('performanceNotes', e.target.value)} placeholder="What went well? What to improve?" /></Field>
-                <Field label="Call Recording Link"><input className="input-field" value={form.callRecording} onChange={e => updateForm('callRecording', e.target.value)} placeholder="https://..." /></Field>
               </>
             )}
 

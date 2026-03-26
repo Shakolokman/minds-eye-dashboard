@@ -256,33 +256,138 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Team Leaderboard */}
-      {teamPerformance.length > 0 && (
-        <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5 mb-8">
-          <h3 className="text-sm font-semibold text-white mb-4">Team Leaderboard</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {teamPerformance.sort((a, b) => (b.outbounds + b.revenue) - (a.outbounds + a.revenue)).map((p, i) => (
-              <div key={i} className="bg-brand-darker rounded-xl p-4 border border-brand-slate/20 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: p.color }}>
-                  {p.name[0]}
+      {/* Individual Performance Breakdowns */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Individual Performance</h2>
+      
+      {/* Setter/Outbound Performance */}
+      {(() => {
+        const setterMembers = team.filter(m => m.role === 'setter' || m.role === 'outbound');
+        if (setterMembers.length === 0) return null;
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            {setterMembers.map(member => {
+              const memberEntries = filteredEntries.filter(e => e.memberId === member.id);
+              const out = memberEntries.reduce((s, e) => s + (parseInt(e.outbounds) || 0), 0);
+              const inb = memberEntries.reduce((s, e) => s + (parseInt(e.inbounds) || 0), 0);
+              const rep = memberEntries.reduce((s, e) => s + (parseInt(e.replies) || 0), 0);
+              const fu1 = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsFirst) || 0), 0);
+              const fuc = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsInConvo) || 0), 0);
+              const qual = memberEntries.reduce((s, e) => s + (parseInt(e.qualifiedConvos) || 0), 0);
+              const links = memberEntries.reduce((s, e) => s + (parseInt(e.bookingLinksSent) || 0), 0);
+              const booked = memberEntries.reduce((s, e) => s + (parseInt(e.bookedCalls) || 0), 0);
+              const daysWorked = memberEntries.length;
+              return (
+                <div key={member.id} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                    <div>
+                      <p className="text-sm font-bold text-white">{member.name}</p>
+                      <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {daysWorked} days reported</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Outbounds</p><p className="text-lg font-bold text-white">{out}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Replies</p><p className="text-lg font-bold text-white">{rep}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Booked</p><p className="text-lg font-bold text-brand-gold">{booked}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (1st)</p><p className="text-lg font-bold text-white">{fu1}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (Convo)</p><p className="text-lg font-bold text-white">{fuc}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Links Sent</p><p className="text-lg font-bold text-white">{links}</p></div>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{p.name}</p>
-                  <p className="text-xs text-brand-muted">{ROLE_LABELS[p.role]}</p>
-                </div>
-                <div className="text-right">
-                  {(p.role === 'setter' || p.role === 'outbound') && (
-                    <p className="text-sm font-bold text-brand-gold">{p.outbounds} <span className="text-xs text-brand-muted font-normal">out</span></p>
-                  )}
-                  {p.role === 'closer' && (
-                    <p className="text-sm font-bold text-brand-gold">{fmtUSD(p.revenue)}</p>
-                  )}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* Closer Performance */}
+      {(() => {
+        const closerMembers = team.filter(m => m.role === 'closer');
+        if (closerMembers.length === 0) return null;
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+            {closerMembers.map(member => {
+              const memberEntries = filteredEntries.filter(e => e.memberId === member.id && e.formType === 'closer');
+              const onCal = memberEntries.length;
+              const live = memberEntries.filter(e => e.showUp === 'live').length;
+              const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
+              const showRate = onCal > 0 ? (live / onCal * 100) : 0;
+              const closed = memberEntries.filter(e => e.closed === 'yes');
+              const closedCount = closed.length;
+              const closeRate = live > 0 ? (closedCount / live * 100) : 0;
+              const rev = closed.reduce((s, e) => s + (parseFloat(e.totalDealSize) || 0), 0);
+              const cash = closed.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
+              const pif = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('pif')).length;
+              const split = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('split')).length;
+              const deposit = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('deposit')).length;
+              return (
+                <div key={member.id} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                    <div>
+                      <p className="text-sm font-bold text-white">{member.name}</p>
+                      <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {onCal} calls</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-lg font-bold text-brand-gold">{fmtUSD(rev)}</p>
+                      <p className="text-xs text-brand-muted">revenue</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">No Shows</p><p className="text-lg font-bold text-red-400">{noShows}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Closed</p><p className="text-lg font-bold text-brand-gold">{closedCount}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Close %</p><p className="text-lg font-bold text-brand-gold">{fmtPct(closeRate)}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Cash</p><p className="text-lg font-bold text-white">{fmtUSD(cash)}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">PIF/Spl/Dep</p><p className="text-lg font-bold text-white">{pif}/{split}/{deposit}</p></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
+
+      {/* Triager Performance */}
+      {(() => {
+        const triagerMembers = team.filter(m => m.role === 'triager');
+        if (triagerMembers.length === 0) return null;
+        return (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+            {triagerMembers.map(member => {
+              const memberEntries = filteredEntries.filter(e => e.memberId === member.id && e.formType === 'triager');
+              const onCal = memberEntries.length;
+              const live = memberEntries.filter(e => e.showUp === 'live').length;
+              const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
+              const showRate = onCal > 0 ? (live / onCal * 100) : 0;
+              const qual = memberEntries.filter(e => e.qualified === 'yes').length;
+              const bookedSC = memberEntries.filter(e => e.bookedForSC === 'yes').length;
+              return (
+                <div key={member.id} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                    <div>
+                      <p className="text-sm font-bold text-white">{member.name}</p>
+                      <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {onCal} calls</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-5 gap-2">
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Qualified</p><p className="text-lg font-bold text-brand-gold">{qual}</p></div>
+                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bookedSC}</p></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
 
       {/* Recent Entries */}
       <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">

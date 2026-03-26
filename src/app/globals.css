@@ -11,7 +11,7 @@
   --brand-gold: #E1C36E;
   --brand-gold-light: #F0D88A;
   --brand-slate: #3A4D58;
-  --brand-muted: #8A9DAB;
+  --brand-muted: #A8BFCC;
   --brand-surface: #324049;
 }
 
@@ -49,10 +49,10 @@ body {
     box-shadow: 0 0 20px rgba(225, 195, 110, 0.05);
   }
   .stat-label {
-    @apply text-brand-muted text-xs font-medium uppercase tracking-wider mb-1;
+    @apply text-brand-muted text-xs font-semibold uppercase tracking-wider mb-1;
   }
   .stat-value {
-    @apply text-2xl font-bold text-white font-display;
+    @apply text-2xl font-bold text-white font-display drop-shadow-sm;
   }
   .gold-glow {
     box-shadow: 0 0 30px rgba(225, 195, 110, 0.15);

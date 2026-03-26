@@ -15,7 +15,7 @@ module.exports = {
           'gold-dim': '#B8A05A',
           slate: '#3A4D58',
           'slate-light': '#4A6070',
-          muted: '#8A9DAB',
+          muted: '#A8BFCC',
           surface: '#324049',
           'surface-light': '#3D4F5A',
         },
