@@ -55,7 +55,7 @@ export default function SubmitPage() {
     leadName: '', leadEmail: '', showUp: '', qualified: '', bookedForSC: '',
     leadQuality: 0, callNotes: '', callRecording: '',
     // Closer
-    closed: '', totalDealSize: '', cashCollected: '', paymentDetails: '',
+    closed: '', totalDealSize: '', cashCollected: '', paymentMethod: '', paymentType: '', paymentDetails: '',
     discoveryRating: 0, pitchRating: 0, objectionRating: 0, performanceNotes: '',
   });
 
@@ -80,7 +80,7 @@ export default function SubmitPage() {
         qualifiedConvos: '', pitchedCalls: '', bookingLinksSent: '', bookedTC: '', bookedSC: '', notes: '',
         leadName: '', leadEmail: '', showUp: '', qualified: '', bookedForSC: '',
         leadQuality: 0, callNotes: '', callRecording: '',
-        closed: '', totalDealSize: '', cashCollected: '', paymentDetails: '',
+        closed: '', totalDealSize: '', cashCollected: '', paymentMethod: '', paymentType: '', paymentDetails: '',
         discoveryRating: 0, pitchRating: 0, objectionRating: 0, performanceNotes: '',
       }));
       if (role === 'setter' || role === 'outbound') setSelectedMember('');
@@ -223,19 +223,62 @@ export default function SubmitPage() {
                 <RadioGroup label="Show up?" required options={[{value:'live',label:'Live Call'},{value:'noshow',label:'No Show'}]} value={form.showUp} onChange={v => updateForm('showUp', v)} />
                 {form.showUp === 'live' && (
                   <>
-                    <RadioGroup label="Closed?" required options={[{value:'yes',label:'Yes'},{value:'no',label:'No'}]} value={form.closed} onChange={v => updateForm('closed', v)} />
+                    <RadioGroup label="Closed?" required options={[{value:'yes',label:'Yes'},{value:'no',label:'No'}]} value={form.closed} onChange={v => { updateForm('closed', v); updateForm('paymentMethod', ''); updateForm('paymentType', ''); }} />
                     {form.closed === 'yes' && (
                       <>
-                        <div className="grid grid-cols-2 gap-3">
-                          <Field label="Total Deal Size" required><input type="number" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$" required /></Field>
-                          <Field label="Cash Collected on Call" required>
-                            <input type="number" className="input-field" value={form.cashCollected} onChange={e => updateForm('cashCollected', e.target.value)} placeholder="$" required />
-                            <p className="text-xs text-brand-muted mt-1">Initial payment collected. Stripe will track recurring payments separately.</p>
-                          </Field>
-                        </div>
-                        <Field label="Payment Details (PIF / deposit / split pay)" required>
-                          <textarea className="input-field min-h-[60px]" value={form.paymentDetails} onChange={e => updateForm('paymentDetails', e.target.value)} placeholder='e.g. PIF or "$2000 × 3 every 30 days"' required />
-                        </Field>
+                        {/* Step 1: Payment Method */}
+                        <RadioGroup label="Payment method?" required options={[{value:'stripe',label:'💳 Stripe'},{value:'wire',label:'🏦 Wire Transfer'}]} value={form.paymentMethod} onChange={v => { updateForm('paymentMethod', v); updateForm('paymentType', ''); }} />
+
+                        {/* Step 2: If Stripe → PIF or Split? */}
+                        {form.paymentMethod === 'stripe' && (
+                          <>
+                            <RadioGroup label="Payment type?" required options={[{value:'pif',label:'PIF (Paid in Full)'},{value:'split',label:'Split / Deposit'}]} value={form.paymentType} onChange={v => updateForm('paymentType', v)} />
+
+                            {/* PIF via Stripe — just deal size, cash auto-pulled from Stripe */}
+                            {form.paymentType === 'pif' && (
+                              <div>
+                                <Field label="Total Deal Size" required>
+                                  <input type="number" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$" required />
+                                </Field>
+                                <div className="bg-emerald-900/20 border border-emerald-600/30 rounded-lg p-3 mt-1">
+                                  <p className="text-xs text-emerald-400">💳 Cash collected will be auto-pulled from Stripe.</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Split via Stripe — deal size + payment schedule */}
+                            {form.paymentType === 'split' && (
+                              <>
+                                <Field label="Total Deal Size (full contract value)" required>
+                                  <input type="number" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$ total contract" required />
+                                </Field>
+                                <Field label="Payment schedule details">
+                                  <textarea className="input-field min-h-[60px]" value={form.paymentDetails} onChange={e => updateForm('paymentDetails', e.target.value)} placeholder='e.g. "$2,000 × 3 every 30 days"' />
+                                </Field>
+                                <div className="bg-emerald-900/20 border border-emerald-600/30 rounded-lg p-3">
+                                  <p className="text-xs text-emerald-400">💳 First payment and future recurring payments will be auto-tracked from Stripe.</p>
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )}
+
+                        {/* Step 2: If Wire → deal size + wire amount */}
+                        {form.paymentMethod === 'wire' && (
+                          <>
+                            <div className="grid grid-cols-2 gap-3">
+                              <Field label="Total Deal Size" required>
+                                <input type="number" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$" required />
+                              </Field>
+                              <Field label="Wire Amount Received" required>
+                                <input type="number" className="input-field" value={form.cashCollected} onChange={e => updateForm('cashCollected', e.target.value)} placeholder="$" required />
+                              </Field>
+                            </div>
+                            <Field label="Payment details">
+                              <textarea className="input-field min-h-[60px]" value={form.paymentDetails} onChange={e => updateForm('paymentDetails', e.target.value)} placeholder='e.g. "PIF wire" or "$2,000 × 3 monthly wire"' />
+                            </Field>
+                          </>
+                        )}
                       </>
                     )}
                     <StarRating label="Lead Quality" value={form.leadQuality} onChange={v => updateForm('leadQuality', v)} />
