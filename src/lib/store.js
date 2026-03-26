@@ -366,14 +366,18 @@ function calculateMetrics(entries, wireTransfers = []) {
   const totalRevenue = closedDeals.reduce((s, e) => {
     const dealSize = parseFloat(e.totalDealSize) || 0;
     const cash = parseFloat(e.cashCollected) || 0;
-    // For Stripe PIF, deal size = cash collected (auto-pulled from Stripe)
-    if (e.paymentMethod === 'stripe' && e.paymentType === 'pif') return s + cash;
-    // For deals with deal size entered, use it
+    // For Stripe PIF, no manual deal size — skip, Stripe handles it
+    if (e.paymentMethod === 'stripe' && e.paymentType === 'pif') return s;
+    // For deals with deal size entered, use it (ignore negatives)
     if (dealSize > 0) return s + dealSize;
-    // Fallback to cash collected if no deal size
-    return s + cash;
+    // For wire with cash but no deal size, use cash
+    if (cash > 0) return s + cash;
+    return s;
   }, 0);
-  const totalCashCollected = closedDeals.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
+  const totalCashCollected = closedDeals.reduce((s, e) => {
+    const cash = parseFloat(e.cashCollected) || 0;
+    return s + Math.max(0, cash);
+  }, 0);
   const wireCash = wireTransfers.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
   const totalCashWithWire = totalCashCollected + wireCash;
   const avgCashPerClose = totalClosed > 0 ? totalCashWithWire / totalClosed : 0;

@@ -253,7 +253,7 @@ export default function SubmitPage() {
                             {form.paymentType === 'split' && (
                               <>
                                 <Field label="Total Deal Size (full contract value)" required>
-                                  <input type="number" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$ total contract" required />
+                                  <input type="number" min="0" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$ total contract" required />
                                 </Field>
                                 <Field label="Payment schedule details">
                                   <textarea className="input-field min-h-[60px]" value={form.paymentDetails} onChange={e => updateForm('paymentDetails', e.target.value)} placeholder='e.g. "$2,000 × 3 every 30 days"' />
@@ -271,10 +271,10 @@ export default function SubmitPage() {
                           <>
                             <div className="grid grid-cols-2 gap-3">
                               <Field label="Total Deal Size" required>
-                                <input type="number" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$" required />
+                                <input type="number" min="0" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$" required />
                               </Field>
                               <Field label="Wire Amount Received" required>
-                                <input type="number" className="input-field" value={form.cashCollected} onChange={e => updateForm('cashCollected', e.target.value)} placeholder="$" required />
+                                <input type="number" min="0" className="input-field" value={form.cashCollected} onChange={e => updateForm('cashCollected', e.target.value)} placeholder="$" required />
                               </Field>
                             </div>
                             <Field label="Payment details">

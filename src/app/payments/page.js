@@ -60,25 +60,35 @@ export default function PaymentsPage() {
     };
   }, [mounted, entries, wires, stripePayments, preset, customStart, customEnd]);
 
-  // Manual deal entries from closers
+  // Deal revenue from closer entries (NOT payments — this is contract value)
   const closedDeals = filteredEntries.filter(e => e.formType === 'closer' && e.closed === 'yes');
-  const manualRevenue = closedDeals.reduce((s, e) => s + (parseFloat(e.totalDealSize) || 0), 0);
-  const manualCash = closedDeals.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
+  const totalRevenue = closedDeals.reduce((s, e) => {
+    const dealSize = parseFloat(e.totalDealSize) || 0;
+    const cash = parseFloat(e.cashCollected) || 0;
+    if (e.paymentMethod === 'stripe' && e.paymentType === 'pif') return s + cash;
+    if (dealSize > 0) return s + dealSize;
+    return s + cash;
+  }, 0);
 
-  // Stripe auto-imported
+  // Stripe auto-imported (actual cash)
   const stripeSucceeded = filteredStripe.filter(p => p.status === 'succeeded');
   const stripeCash = stripeSucceeded.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
   const stripeRefunds = filteredStripe.filter(p => p.status === 'refunded');
   const refundTotal = stripeRefunds.reduce((s, p) => s + Math.abs(parseFloat(p.amount) || 0), 0);
 
-  // Wire transfers
+  // Wire transfers (actual cash)
   const wireCash = filteredWires.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
 
+  // Wire cash from closer entries (payment method = wire)
+  const closerWireCash = closedDeals
+    .filter(e => e.paymentMethod === 'wire')
+    .reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
+
   // Totals
-  const totalCash = stripeCash + wireCash + manualCash;
+  const totalCash = stripeCash + wireCash + closerWireCash;
   const netCash = totalCash - refundTotal;
 
-  // Unified payment list
+  // Payment list — only actual cash sources (Stripe auto + Wire transfers + closer wire entries)
   const allPayments = [
     ...filteredStripe.map(p => ({
       type: 'stripe_auto',
@@ -86,27 +96,11 @@ export default function PaymentsPage() {
       client: p.customerName || p.customerEmail || '—',
       email: p.customerEmail,
       amount: parseFloat(p.amount) || 0,
-      deal: 0,
-      method: 'Stripe (auto)',
+      method: 'Stripe',
       paymentType: TYPE_LABELS[p.paymentType] || p.paymentType,
-      planName: p.planName,
       status: p.status,
       details: p.planName || TYPE_LABELS[p.paymentType] || '',
       closer: '',
-    })),
-    ...closedDeals.map(e => ({
-      type: 'deal',
-      date: e.date,
-      client: e.leadName,
-      email: e.leadEmail,
-      amount: parseFloat(e.cashCollected) || 0,
-      deal: parseFloat(e.totalDealSize) || 0,
-      method: 'Stripe (manual)',
-      paymentType: (e.paymentDetails || '').toLowerCase().includes('pif') ? 'One-time' : 'Split/Deposit',
-      planName: '',
-      status: 'succeeded',
-      details: e.paymentDetails,
-      closer: team.find(m => m.id === e.memberId)?.name || '',
     })),
     ...filteredWires.map(w => ({
       type: 'wire',
@@ -114,13 +108,23 @@ export default function PaymentsPage() {
       client: w.clientName,
       email: '',
       amount: parseFloat(w.amount) || 0,
-      deal: 0,
       method: 'Wire Transfer',
       paymentType: 'Wire',
-      planName: '',
       status: 'succeeded',
       details: w.notes,
       closer: w.collectedBy,
+    })),
+    ...closedDeals.filter(e => e.paymentMethod === 'wire').map(e => ({
+      type: 'closer_wire',
+      date: e.date,
+      client: e.leadName,
+      email: e.leadEmail,
+      amount: parseFloat(e.cashCollected) || 0,
+      method: 'Wire Transfer',
+      paymentType: 'Wire (from close)',
+      status: 'succeeded',
+      details: e.paymentDetails,
+      closer: team.find(m => m.id === e.memberId)?.name || '',
     })),
   ].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
@@ -188,12 +192,13 @@ export default function PaymentsPage() {
       )}
 
       {/* Payment Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <StatCard label="Stripe Payments" value={fmtUSD(stripeCash)} icon="💳" subtitle={`${stripeSucceeded.length} transactions`} />
-        <StatCard label="Manual Entries" value={fmtUSD(manualCash)} icon="📝" subtitle={`${closedDeals.length} deals`} />
-        <StatCard label="Wire Transfers" value={fmtUSD(wireCash)} icon="🏦" subtitle={`${filteredWires.length} transfers`} />
-        <StatCard label="Refunds" value={fmtUSD(refundTotal)} icon="↩️" subtitle={`${stripeRefunds.length} refunds`} />
-        <StatCard label="Net Cash Collected" value={fmtUSD(netCash)} highlight icon="💵" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+        <StatCard label="Total Revenue" value={fmtUSD(totalRevenue)} highlight icon="💰" subtitle={`${closedDeals.length} deal${closedDeals.length === 1 ? '' : 's'} closed`} />
+        <StatCard label="Stripe Cash" value={fmtUSD(stripeCash)} icon="💳" subtitle={`${stripeSucceeded.length} payment${stripeSucceeded.length === 1 ? '' : 's'}`} />
+        <StatCard label="Wire Cash" value={fmtUSD(wireCash + closerWireCash)} icon="🏦" subtitle={`${filteredWires.length + closedDeals.filter(e => e.paymentMethod === 'wire').length} transfer${filteredWires.length === 1 ? '' : 's'}`} />
+        <StatCard label="Refunds" value={fmtUSD(refundTotal)} icon="↩️" subtitle={`${stripeRefunds.length} refund${stripeRefunds.length === 1 ? '' : 's'}`} />
+        <StatCard label="Total Cash" value={fmtUSD(netCash)} highlight icon="💵" />
+        <StatCard label="Cash / Revenue" value={totalRevenue > 0 ? `${(netCash / totalRevenue * 100).toFixed(1)}%` : '—'} icon="📊" />
       </div>
 
       {/* Stripe Status Banner */}
