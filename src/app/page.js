@@ -430,7 +430,7 @@ export default function Dashboard() {
                         {entry.formType === 'setter' && `${entry.outbounds} out · ${entry.replies} rep · ${entry.bookedTC || 0} TC · ${entry.bookedSC || 0} SC`}
                         {entry.formType === 'outbound' && `${entry.outbounds} out · ${entry.followUpsFirst} FU`}
                         {entry.formType === 'triage' && `${entry.showUp === 'live' ? '✅ Live' : '❌ No Show'} · ${entry.qualified === 'yes' ? 'Qualified' : 'Not Qual.'}`}
-                        {entry.formType === 'closer' && `${entry.showUp === 'live' ? '✅' : '❌'} ${entry.closed === 'yes' ? `Closed ${fmtUSD(parseFloat(entry.totalDealSize))}` : 'No close'}`}
+                        {entry.formType === 'closer' && `${entry.showUp === 'noshow' ? '❌ No Show' : (entry.closed === 'yes' ? `✅ Closed ${fmtUSD(parseFloat(entry.totalDealSize))}` : '❌ No close')}`}
                       </td>
                     </tr>
                   );
