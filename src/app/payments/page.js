@@ -202,17 +202,13 @@ export default function PaymentsPage() {
         <div className="flex-1">
           <p className="text-sm font-medium text-white">Stripe Integration</p>
           <p className="text-xs text-brand-muted">
-            {hasStripeIntegration
-              ? `Connected — ${stripePayments.length} payments imported automatically`
-              : 'Webhook endpoint ready. Add your Stripe keys in Vercel to activate.'}
+            {stripePayments.length > 0
+              ? `${stripePayments.length} payment${stripePayments.length === 1 ? '' : 's'} imported automatically`
+              : 'Connected — payments will appear here automatically'}
           </p>
         </div>
-        <span className={`text-xs px-2 py-1 rounded-full border ${
-          hasStripeIntegration
-            ? 'bg-emerald-900/30 text-emerald-400 border-emerald-600/30'
-            : 'bg-amber-900/30 text-amber-400 border-amber-600/30'
-        }`}>
-          {hasStripeIntegration ? 'Connected' : 'Pending Setup'}
+        <span className="text-xs px-2 py-1 rounded-full border bg-emerald-900/30 text-emerald-400 border-emerald-600/30">
+          Connected
         </span>
       </div>
 

@@ -162,17 +162,9 @@ export default function SettingsPage() {
             <span className="text-lg">💳</span>
             <div className="flex-1">
               <p className="text-sm font-medium text-white">Stripe</p>
-              <p className="text-xs text-brand-muted">Auto-import payment data</p>
+              <p className="text-xs text-brand-muted">Auto-import payments, refunds, and subscriptions</p>
             </div>
-            <span className="text-xs px-2 py-1 rounded-full bg-amber-900/30 text-amber-400 border border-amber-600/30">Add API Key in Vercel</span>
-          </div>
-          <div className="flex items-center gap-3 p-3 bg-brand-darker rounded-lg border border-brand-slate/20">
-            <span className="text-lg">📊</span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-white">Google Sheets</p>
-              <p className="text-xs text-brand-muted">Backup data to spreadsheet</p>
-            </div>
-            <span className="text-xs px-2 py-1 rounded-full bg-amber-900/30 text-amber-400 border border-amber-600/30">Coming Soon</span>
+            <span className="text-xs px-2 py-1 rounded-full bg-emerald-900/30 text-emerald-400 border border-emerald-600/30">Connected</span>
           </div>
         </div>
       </div>
