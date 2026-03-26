@@ -234,15 +234,11 @@ export default function SubmitPage() {
                           <>
                             <RadioGroup label="Payment type?" required options={[{value:'pif',label:'PIF (Paid in Full)'},{value:'split',label:'Split / Deposit'}]} value={form.paymentType} onChange={v => updateForm('paymentType', v)} />
 
-                            {/* PIF via Stripe — just deal size, cash auto-pulled from Stripe */}
+                            {/* PIF via Stripe — everything auto-pulled */}
                             {form.paymentType === 'pif' && (
-                              <div>
-                                <Field label="Total Deal Size" required>
-                                  <input type="number" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$" required />
-                                </Field>
-                                <div className="bg-emerald-900/20 border border-emerald-600/30 rounded-lg p-3 mt-1">
-                                  <p className="text-xs text-emerald-400">💳 Cash collected will be auto-pulled from Stripe.</p>
-                                </div>
+                              <div className="bg-emerald-900/20 border border-emerald-600/30 rounded-lg p-4">
+                                <p className="text-sm font-medium text-emerald-400 mb-1">💳 All data auto-pulled from Stripe</p>
+                                <p className="text-xs text-emerald-400/70">Deal size and cash collected will be imported automatically from the Stripe payment. Nothing to enter here.</p>
                               </div>
                             )}
 
