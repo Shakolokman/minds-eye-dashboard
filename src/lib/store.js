@@ -270,6 +270,9 @@ function getDateRange(preset) {
   const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
   let start;
   switch (preset) {
+    case 'today':
+      start = new Date(end.getFullYear(), end.getMonth(), end.getDate(), 0, 0, 0);
+      break;
     case '7d':
       start = new Date(end);
       start.setDate(start.getDate() - 6);

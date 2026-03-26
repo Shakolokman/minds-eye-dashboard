@@ -2,6 +2,7 @@
 import { useState } from 'react';
 
 const PRESETS = [
+  { key: 'today', label: 'Today' },
   { key: '7d', label: 'Last 7 Days' },
   { key: '14d', label: 'Last 2 Weeks' },
   { key: 'month', label: 'This Month' },

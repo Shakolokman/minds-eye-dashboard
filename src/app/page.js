@@ -222,7 +222,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* DM & Outbound Metrics */}
+      {/* DM Setting Performance */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">DM Setting Performance</h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         <StatCard label="Total Outbounds" value={fmt(metrics.totalOutbounds)} icon="📤" kpiColor={kc.outbounds} target={Math.round(kpi.totalOutbounds)} />
         <StatCard label="Total Inbounds" value={fmt(metrics.totalInbounds)} icon="📥" />
@@ -234,41 +235,6 @@ export default function Dashboard() {
         <StatCard label="Links Sent" value={fmt(metrics.totalLinksSent)} icon="🔗" kpiColor={kc.links} target={Math.round(kpi.linksSent)} />
         <StatCard label="Total Booked" value={fmt(metrics.totalBookedCalls)} icon="📅" kpiColor={kc.booked} target={Math.round(kpi.totalBooked)} subtitle={`${metrics.setterBookedTC} TC · ${metrics.setterBookedSC} SC`} />
         <StatCard label="DM→Link CR" value={fmtPct(metrics.dmToLinkCR)} icon="📊" />
-      </div>
-
-      {/* Triage Metrics */}
-      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Triage Performance</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-        <StatCard label="On Calendar TC" value={metrics.triageOnCalendar} icon="📋" />
-        <StatCard label="Held TC" value={metrics.triageLiveCalls} icon="✅" />
-        <StatCard label="No Shows TC" value={metrics.triageNoShows} icon="❌" />
-        <StatCard label="Show-Up Rate (All)" value={fmtPct(metrics.allShowUpRate)} icon="📈" kpiColor={kc.showUp} target="80%" />
-        <StatCard label="TC→SC CR" value={fmtPct(metrics.tcToScCR)} icon="🔄" />
-        <StatCard label="Qualified" value={metrics.triageQualified} icon="⭐" />
-        <StatCard label="Sales Calls Booked" value={metrics.triageBookedSC} highlight icon="🎯" />
-      </div>
-
-      {/* Closer Metrics */}
-      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Closer Performance</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-        <StatCard label="On Calendar SC" value={metrics.closerOnCalendar} icon="📋" />
-        <StatCard label="Held SC" value={metrics.closerLiveCalls} icon="✅" />
-        <StatCard label="Show-Up Rate SC" value={fmtPct(metrics.closerShowUpRate)} icon="📈" />
-        <StatCard label="Deals Closed" value={metrics.totalClosed} highlight icon="🏆" />
-        <StatCard label="Close Rate" value={fmtPct(metrics.closeRate)} icon="🎯" kpiColor={kc.closeRate} target="30%" />
-      </div>
-
-      {/* Revenue Metrics */}
-      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Revenue & Payments</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-        <StatCard label="Total Revenue" value={fmtUSD(metrics.totalRevenue)} icon="💰" kpiColor={kc.revenue} target={fmtUSD(Math.round(kpi.revenue))} />
-        <StatCard label="Cash Collected" value={fmtUSD(metrics.totalCashWithWire)} icon="💵" subtitle={metrics.wireCash > 0 ? `incl. ${fmtUSD(metrics.wireCash)} wire` : undefined} />
-        <StatCard label="AVG Cash/Close" value={fmtUSD(metrics.avgCashPerClose)} icon="📊" />
-        <StatCard label="AVG Rev/Close" value={fmtUSD(metrics.avgRevPerClose)} icon="📊" />
-        <StatCard label="Cash to Rev %" value={fmtPct(metrics.cashToRevPercent)} icon="🔄" />
-        <StatCard label="PIF Deals" value={metrics.pifDeals} icon="✅" />
-        <StatCard label="Split Pay" value={metrics.splitDeals} icon="📋" />
-        <StatCard label="Deposit Close" value={metrics.depositDeals} icon="📝" />
       </div>
 
       {/* Charts Row */}
@@ -318,139 +284,207 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Individual Performance Breakdowns */}
-      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Individual Performance</h2>
-      
-      {/* Setter/Outbound Performance */}
+      {/* Individual DM Setter / Outbound Performance — under DM Setting section */}
       {(() => {
-        const setterMembers = team.filter(m => m.role === 'setter' || m.role === 'outbound');
-        if (setterMembers.length === 0) return null;
+        // Get current team members with setter/outbound role + any members from entries in this period
+        const currentSetterIds = new Set(team.filter(m => m.role === 'setter' || m.role === 'outbound').map(m => m.id));
+        const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'setter' || e.formType === 'outbound').map(e => e.memberId));
+        const allIds = new Set([...currentSetterIds, ...entryMemberIds]);
+        if (allIds.size === 0) return null;
+
+        // Build member info — use team data if available, fallback for removed members
+        const members = [...allIds].map(id => {
+          const m = team.find(t => t.id === id);
+          return m || { id, name: 'Former Member', role: 'setter', color: '#8A9DAB' };
+        });
+
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            {setterMembers.map(member => {
-              const memberEntries = filteredEntries.filter(e => e.memberId === member.id);
-              const out = memberEntries.reduce((s, e) => s + (parseInt(e.outbounds) || 0), 0);
-              const inb = memberEntries.reduce((s, e) => s + (parseInt(e.inbounds) || 0), 0);
-              const rep = memberEntries.reduce((s, e) => s + (parseInt(e.replies) || 0), 0);
-              const fu1 = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsFirst) || 0), 0);
-              const fuc = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsInConvo) || 0), 0);
-              const qual = memberEntries.reduce((s, e) => s + (parseInt(e.qualifiedConvos) || 0), 0);
-              const links = memberEntries.reduce((s, e) => s + (parseInt(e.bookingLinksSent) || 0), 0);
-              const btc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedTC) || 0), 0);
-              const bsc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedSC) || 0), 0);
-              const daysWorked = memberEntries.length;
-              return (
-                <div key={member.id} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
-                    <div>
-                      <p className="text-sm font-bold text-white">{member.name}</p>
-                      <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {daysWorked} days reported</p>
+          <>
+            <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Individual DM Setter / Outbound</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              {members.map(member => {
+                const memberEntries = filteredEntries.filter(e => e.memberId === member.id && (e.formType === 'setter' || e.formType === 'outbound'));
+                const out = memberEntries.reduce((s, e) => s + (parseInt(e.outbounds) || 0), 0);
+                const rep = memberEntries.reduce((s, e) => s + (parseInt(e.replies) || 0), 0);
+                const fu1 = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsFirst) || 0), 0);
+                const fuc = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsInConvo) || 0), 0);
+                const links = memberEntries.reduce((s, e) => s + (parseInt(e.bookingLinksSent) || 0), 0);
+                const btc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedTC) || 0), 0);
+                const bsc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedSC) || 0), 0);
+                const daysWorked = memberEntries.length;
+                const isRemoved = !team.find(t => t.id === member.id);
+                return (
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
+                        <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {daysWorked} days reported</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Outbounds</p><p className="text-lg font-bold text-white">{out}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Replies</p><p className="text-lg font-bold text-white">{rep}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Links Sent</p><p className="text-lg font-bold text-white">{links}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (1st)</p><p className="text-lg font-bold text-white">{fu1}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC Booked</p><p className="text-lg font-bold text-brand-gold">{btc}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bsc}</p></div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Outbounds</p><p className="text-lg font-bold text-white">{out}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Replies</p><p className="text-lg font-bold text-white">{rep}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Links Sent</p><p className="text-lg font-bold text-white">{links}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (1st)</p><p className="text-lg font-bold text-white">{fu1}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC Booked</p><p className="text-lg font-bold text-brand-gold">{btc}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bsc}</p></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         );
       })()}
 
-      {/* Closer Performance */}
+      {/* Triage Metrics */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Triage Performance</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <StatCard label="On Calendar TC" value={metrics.triageOnCalendar} icon="📋" />
+        <StatCard label="Held TC" value={metrics.triageLiveCalls} icon="✅" />
+        <StatCard label="No Shows TC" value={metrics.triageNoShows} icon="❌" />
+        <StatCard label="Show-Up Rate (All)" value={fmtPct(metrics.allShowUpRate)} icon="📈" kpiColor={kc.showUp} target="80%" />
+        <StatCard label="TC→SC CR" value={fmtPct(metrics.tcToScCR)} icon="🔄" />
+        <StatCard label="Qualified" value={metrics.triageQualified} icon="⭐" />
+        <StatCard label="Sales Calls Booked" value={metrics.triageBookedSC} highlight icon="🎯" />
+      </div>
+
+      {/* Individual Triager Performance */}
       {(() => {
-        const closerMembers = team.filter(m => m.role === 'closer');
-        if (closerMembers.length === 0) return null;
+        const currentTriagerIds = new Set(team.filter(m => m.role === 'triager').map(m => m.id));
+        const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'triager' || e.formType === 'triage').map(e => e.memberId));
+        const allIds = new Set([...currentTriagerIds, ...entryMemberIds]);
+        if (allIds.size === 0) return null;
+
+        const members = [...allIds].map(id => {
+          const m = team.find(t => t.id === id);
+          return m || { id, name: 'Former Member', role: 'triager', color: '#8A9DAB' };
+        });
+
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-            {closerMembers.map(member => {
-              const memberEntries = filteredEntries.filter(e => e.memberId === member.id && e.formType === 'closer');
-              const onCal = memberEntries.length;
-              const live = memberEntries.filter(e => e.showUp === 'live').length;
-              const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
-              const showRate = onCal > 0 ? (live / onCal * 100) : 0;
-              const closed = memberEntries.filter(e => e.closed === 'yes');
-              const closedCount = closed.length;
-              const closeRate = live > 0 ? (closedCount / live * 100) : 0;
-              const rev = closed.reduce((s, e) => s + (parseFloat(e.totalDealSize) || 0), 0);
-              const cash = closed.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
-              const pif = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('pif')).length;
-              const split = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('split')).length;
-              const deposit = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('deposit')).length;
-              return (
-                <div key={member.id} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
-                    <div>
-                      <p className="text-sm font-bold text-white">{member.name}</p>
-                      <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {onCal} calls</p>
+          <>
+            <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Individual Triager</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+              {members.map(member => {
+                const memberEntries = filteredEntries.filter(e => e.memberId === member.id && (e.formType === 'triager' || e.formType === 'triage'));
+                const onCal = memberEntries.length;
+                const live = memberEntries.filter(e => e.showUp === 'live').length;
+                const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
+                const showRate = onCal > 0 ? (live / onCal * 100) : 0;
+                const qual = memberEntries.filter(e => e.qualified === 'yes').length;
+                const bookedSC = memberEntries.filter(e => e.bookedForSC === 'yes').length;
+                const isRemoved = !team.find(t => t.id === member.id);
+                return (
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
+                        <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {onCal} calls</p>
+                      </div>
                     </div>
-                    <div className="ml-auto text-right">
-                      <p className="text-lg font-bold text-brand-gold">{fmtUSD(rev)}</p>
-                      <p className="text-xs text-brand-muted">revenue</p>
+                    <div className="grid grid-cols-5 gap-2">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Qualified</p><p className="text-lg font-bold text-brand-gold">{qual}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bookedSC}</p></div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">No Shows</p><p className="text-lg font-bold text-red-400">{noShows}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Closed</p><p className="text-lg font-bold text-brand-gold">{closedCount}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Close %</p><p className="text-lg font-bold text-brand-gold">{fmtPct(closeRate)}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Cash</p><p className="text-lg font-bold text-white">{fmtUSD(cash)}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">PIF/Spl/Dep</p><p className="text-lg font-bold text-white">{pif}/{split}/{deposit}</p></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         );
       })()}
 
-      {/* Triager Performance */}
+      {/* Closer Metrics */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Closer Performance</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <StatCard label="On Calendar SC" value={metrics.closerOnCalendar} icon="📋" />
+        <StatCard label="Held SC" value={metrics.closerLiveCalls} icon="✅" />
+        <StatCard label="Show-Up Rate SC" value={fmtPct(metrics.closerShowUpRate)} icon="📈" />
+        <StatCard label="Deals Closed" value={metrics.totalClosed} highlight icon="🏆" />
+        <StatCard label="Close Rate" value={fmtPct(metrics.closeRate)} icon="🎯" kpiColor={kc.closeRate} target="30%" />
+      </div>
+
+      {/* Individual Closer Performance */}
       {(() => {
-        const triagerMembers = team.filter(m => m.role === 'triager');
-        if (triagerMembers.length === 0) return null;
+        const currentCloserIds = new Set(team.filter(m => m.role === 'closer').map(m => m.id));
+        const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'closer').map(e => e.memberId));
+        const allIds = new Set([...currentCloserIds, ...entryMemberIds]);
+        if (allIds.size === 0) return null;
+
+        const members = [...allIds].map(id => {
+          const m = team.find(t => t.id === id);
+          return m || { id, name: 'Former Member', role: 'closer', color: '#8A9DAB' };
+        });
+
         return (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-            {triagerMembers.map(member => {
-              const memberEntries = filteredEntries.filter(e => e.memberId === member.id && e.formType === 'triager');
-              const onCal = memberEntries.length;
-              const live = memberEntries.filter(e => e.showUp === 'live').length;
-              const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
-              const showRate = onCal > 0 ? (live / onCal * 100) : 0;
-              const qual = memberEntries.filter(e => e.qualified === 'yes').length;
-              const bookedSC = memberEntries.filter(e => e.bookedForSC === 'yes').length;
-              return (
-                <div key={member.id} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
-                    <div>
-                      <p className="text-sm font-bold text-white">{member.name}</p>
-                      <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {onCal} calls</p>
+          <>
+            <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Individual Closer</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              {members.map(member => {
+                const memberEntries = filteredEntries.filter(e => e.memberId === member.id && e.formType === 'closer');
+                const onCal = memberEntries.length;
+                const live = memberEntries.filter(e => e.showUp === 'live').length;
+                const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
+                const showRate = onCal > 0 ? (live / onCal * 100) : 0;
+                const closed = memberEntries.filter(e => e.closed === 'yes');
+                const closedCount = closed.length;
+                const closeRate = live > 0 ? (closedCount / live * 100) : 0;
+                const rev = closed.reduce((s, e) => s + (parseFloat(e.totalDealSize) || 0), 0);
+                const cash = closed.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
+                const pif = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('pif')).length;
+                const split = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('split')).length;
+                const deposit = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('deposit')).length;
+                const isRemoved = !team.find(t => t.id === member.id);
+                return (
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
+                        <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {onCal} calls</p>
+                      </div>
+                      <div className="ml-auto text-right">
+                        <p className="text-lg font-bold text-brand-gold">{fmtUSD(rev)}</p>
+                        <p className="text-xs text-brand-muted">revenue</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">No Shows</p><p className="text-lg font-bold text-red-400">{noShows}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Closed</p><p className="text-lg font-bold text-brand-gold">{closedCount}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Close %</p><p className="text-lg font-bold text-brand-gold">{fmtPct(closeRate)}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Cash</p><p className="text-lg font-bold text-white">{fmtUSD(cash)}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">PIF/Spl/Dep</p><p className="text-lg font-bold text-white">{pif}/{split}/{deposit}</p></div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-5 gap-2">
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Qualified</p><p className="text-lg font-bold text-brand-gold">{qual}</p></div>
-                    <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bookedSC}</p></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         );
       })()}
+
+      {/* Revenue & Payments */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Revenue & Payments</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+        <StatCard label="Total Revenue" value={fmtUSD(metrics.totalRevenue)} icon="💰" kpiColor={kc.revenue} target={fmtUSD(Math.round(kpi.revenue))} />
+        <StatCard label="Cash Collected" value={fmtUSD(metrics.totalCashWithWire)} icon="💵" subtitle={metrics.wireCash > 0 ? `incl. ${fmtUSD(metrics.wireCash)} wire` : undefined} />
+        <StatCard label="AVG Cash/Close" value={fmtUSD(metrics.avgCashPerClose)} icon="📊" />
+        <StatCard label="AVG Rev/Close" value={fmtUSD(metrics.avgRevPerClose)} icon="📊" />
+        <StatCard label="Cash to Rev %" value={fmtPct(metrics.cashToRevPercent)} icon="🔄" />
+        <StatCard label="PIF Deals" value={metrics.pifDeals} icon="✅" />
+        <StatCard label="Split Pay" value={metrics.splitDeals} icon="📋" />
+        <StatCard label="Deposit Close" value={metrics.depositDeals} icon="📝" />
+      </div>
 
       {/* Recent Entries */}
       <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
