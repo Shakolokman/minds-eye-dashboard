@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie } from 'recharts';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, getDateRange, filterByDateRange, calculateMetrics, ROLE_LABELS } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, getDateRange, filterByDateRange, calculateMetrics, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
 
 const fmt = (n) => typeof n === 'number' ? (n >= 1000 ? `${(n/1000).toFixed(1)}k` : n % 1 === 0 ? n.toString() : n.toFixed(1)) : '0';
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -46,6 +46,48 @@ export default function Dashboard() {
   }, [mounted, preset, customStart, customEnd, allEntries, wireTransfers]);
 
   const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires), [filteredEntries, filteredWires]);
+
+  // Calculate KPI targets scaled to the selected date range
+  const kpi = useMemo(() => {
+    if (!mounted) return {};
+    let start, end;
+    if (preset === 'custom' && customStart && customEnd) {
+      start = new Date(customStart + 'T00:00:00');
+      end = new Date(customEnd + 'T23:59:59');
+    } else {
+      const range = getDateRange(preset);
+      start = range.start; end = range.end;
+    }
+    const days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+    const weeks = days / 7;
+    // Scale weekly KPIs to the number of days in range
+    const scale = (weeklyTarget) => weeklyTarget * weeks;
+    return {
+      totalOutbounds: scale(WEEKLY_KPIS.totalOutbounds),
+      followUpsInConvo: scale(WEEKLY_KPIS.followUpsInConvo),
+      pitchedCalls: scale(WEEKLY_KPIS.pitchedCalls),
+      linksSent: scale(WEEKLY_KPIS.linksSent),
+      totalBooked: scale(WEEKLY_KPIS.totalBooked),
+      revenue: scale(WEEKLY_KPIS.revenue),
+      // Rate-based KPIs don't scale
+      showUpRate: WEEKLY_KPIS.showUpRate,
+      closeRate: WEEKLY_KPIS.closeRate,
+      replyRate: WEEKLY_KPIS.replyRate,
+    };
+  }, [mounted, preset, customStart, customEnd]);
+
+  // Get colors for each metric
+  const kc = {
+    outbounds: getKpiColor(metrics.totalOutbounds, kpi.totalOutbounds),
+    followUpsConvo: getKpiColor(metrics.totalFollowUpsInConvo, kpi.followUpsInConvo),
+    pitched: getKpiColor(metrics.totalPitched, kpi.pitchedCalls),
+    links: getKpiColor(metrics.totalLinksSent, kpi.linksSent),
+    booked: getKpiColor(metrics.totalBookedCalls, kpi.totalBooked),
+    replyRate: getKpiColor(metrics.replyRate, kpi.replyRate),
+    showUp: getKpiColor(metrics.allShowUpRate, kpi.showUpRate),
+    closeRate: getKpiColor(metrics.closeRate, kpi.closeRate),
+    revenue: getKpiColor(metrics.totalRevenue, kpi.revenue),
+  };
 
   // Funnel data
   const funnelData = [
@@ -162,17 +204,15 @@ export default function Dashboard() {
 
       {/* DM & Outbound Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-        <StatCard label="Total Outbounds" value={fmt(metrics.totalOutbounds)} icon="📤" />
+        <StatCard label="Total Outbounds" value={fmt(metrics.totalOutbounds)} icon="📤" kpiColor={kc.outbounds} target={Math.round(kpi.totalOutbounds)} />
         <StatCard label="Total Inbounds" value={fmt(metrics.totalInbounds)} icon="📥" />
-        <StatCard label="Replies" value={fmt(metrics.totalReplies)} icon="💬" />
+        <StatCard label="Reply Rate" value={fmtPct(metrics.replyRate)} icon="💬" kpiColor={kc.replyRate} target="30%" subtitle={`${fmt(metrics.totalReplies)} replies`} />
         <StatCard label="Follow Ups (1st)" value={fmt(metrics.totalFollowUpsFirst)} icon="🔄" />
-        <StatCard label="Follow Ups (Convo)" value={fmt(metrics.totalFollowUpsInConvo)} icon="🔁" />
+        <StatCard label="Follow Ups (Convo)" value={fmt(metrics.totalFollowUpsInConvo)} icon="🔁" kpiColor={kc.followUpsConvo} target={Math.round(kpi.followUpsInConvo)} />
         <StatCard label="Qualified Convos" value={fmt(metrics.totalQualified)} icon="✅" />
-        <StatCard label="Pitched Calls" value={fmt(metrics.totalPitched)} icon="📞" />
-        <StatCard label="Links Sent" value={fmt(metrics.totalLinksSent)} icon="🔗" />
-        <StatCard label="TC Booked" value={fmt(metrics.setterBookedTC)} highlight icon="📅" />
-        <StatCard label="SC Booked (direct)" value={fmt(metrics.setterBookedSC)} highlight icon="🎯" />
-        <StatCard label="Total Booked" value={fmt(metrics.totalBookedCalls)} icon="📊" subtitle="TC + SC combined" />
+        <StatCard label="Pitched Calls" value={fmt(metrics.totalPitched)} icon="📞" kpiColor={kc.pitched} target={Math.round(kpi.pitchedCalls)} />
+        <StatCard label="Links Sent" value={fmt(metrics.totalLinksSent)} icon="🔗" kpiColor={kc.links} target={Math.round(kpi.linksSent)} />
+        <StatCard label="Total Booked" value={fmt(metrics.totalBookedCalls)} icon="📅" kpiColor={kc.booked} target={Math.round(kpi.totalBooked)} subtitle={`${metrics.setterBookedTC} TC · ${metrics.setterBookedSC} SC`} />
         <StatCard label="DM→Link CR" value={fmtPct(metrics.dmToLinkCR)} icon="📊" />
       </div>
 
@@ -182,7 +222,7 @@ export default function Dashboard() {
         <StatCard label="On Calendar TC" value={metrics.triageOnCalendar} icon="📋" />
         <StatCard label="Held TC" value={metrics.triageLiveCalls} icon="✅" />
         <StatCard label="No Shows TC" value={metrics.triageNoShows} icon="❌" />
-        <StatCard label="Show-Up Rate TC" value={fmtPct(metrics.triageShowUpRate)} highlight icon="📈" />
+        <StatCard label="Show-Up Rate (All)" value={fmtPct(metrics.allShowUpRate)} icon="📈" kpiColor={kc.showUp} target="80%" />
         <StatCard label="TC→SC CR" value={fmtPct(metrics.tcToScCR)} icon="🔄" />
         <StatCard label="Qualified" value={metrics.triageQualified} icon="⭐" />
         <StatCard label="Sales Calls Booked" value={metrics.triageBookedSC} highlight icon="🎯" />
@@ -195,13 +235,13 @@ export default function Dashboard() {
         <StatCard label="Held SC" value={metrics.closerLiveCalls} icon="✅" />
         <StatCard label="Show-Up Rate SC" value={fmtPct(metrics.closerShowUpRate)} icon="📈" />
         <StatCard label="Deals Closed" value={metrics.totalClosed} highlight icon="🏆" />
-        <StatCard label="Close Rate" value={fmtPct(metrics.closeRate)} highlight icon="🎯" />
+        <StatCard label="Close Rate" value={fmtPct(metrics.closeRate)} icon="🎯" kpiColor={kc.closeRate} target="30%" />
       </div>
 
       {/* Revenue Metrics */}
       <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Revenue & Payments</h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-        <StatCard label="Total Revenue" value={fmtUSD(metrics.totalRevenue)} highlight icon="💰" />
+        <StatCard label="Total Revenue" value={fmtUSD(metrics.totalRevenue)} icon="💰" kpiColor={kc.revenue} target={fmtUSD(Math.round(kpi.revenue))} />
         <StatCard label="Cash Collected" value={fmtUSD(metrics.totalCashWithWire)} icon="💵" subtitle={metrics.wireCash > 0 ? `incl. ${fmtUSD(metrics.wireCash)} wire` : undefined} />
         <StatCard label="AVG Cash/Close" value={fmtUSD(metrics.avgCashPerClose)} icon="📊" />
         <StatCard label="AVG Rev/Close" value={fmtUSD(metrics.avgRevPerClose)} icon="📊" />

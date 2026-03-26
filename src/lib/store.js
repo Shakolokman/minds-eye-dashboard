@@ -23,6 +23,48 @@ const ROLE_COLORS = {
   outbound: 'bg-blue-600',
 };
 
+// KPI Targets (weekly)
+const WEEKLY_KPIS = {
+  totalOutbounds: 1000,
+  followUpsInConvo: 500,
+  pitchedCalls: 50,
+  linksSent: 30,
+  totalBooked: 20,
+  showUpRate: 80,       // percentage
+  closeRate: 30,        // percentage
+  replyRate: 30,        // percentage
+  revenue: 25000,
+};
+
+// Daily = weekly / 5
+const DAILY_KPIS = Object.fromEntries(
+  Object.entries(WEEKLY_KPIS).map(([k, v]) => [k, v / 5])
+);
+
+// Returns 'green' | 'lightgreen' | 'orange' | 'red' | null
+function getKpiColor(actual, target) {
+  if (target === 0 || target === undefined || target === null) return null;
+  const pct = (actual / target) * 100;
+  if (pct >= 90) return 'green';
+  if (pct >= 80) return 'lightgreen';
+  if (pct >= 60) return 'orange';
+  return 'red';
+}
+
+const KPI_BG = {
+  green: 'bg-emerald-500/15 border-emerald-500/40',
+  lightgreen: 'bg-lime-500/15 border-lime-400/40',
+  orange: 'bg-orange-500/15 border-orange-500/40',
+  red: 'bg-red-500/15 border-red-500/40',
+};
+
+const KPI_TEXT = {
+  green: 'text-emerald-400',
+  lightgreen: 'text-lime-400',
+  orange: 'text-orange-400',
+  red: 'text-red-400',
+};
+
 function getStorage(key, fallback) {
   if (typeof window === 'undefined') return fallback;
   try {
@@ -193,13 +235,18 @@ function calculateMetrics(entries, wireTransfers = []) {
   const depositDeals = closedDeals.filter(e => (e.paymentDetails || '').toLowerCase().includes('deposit')).length;
 
   const totalConversations = totalOutbounds + totalInbounds;
+  const replyRate = totalConversations > 0 ? (totalReplies / totalConversations * 100) : 0;
   const dmToLinkCR = totalConversations > 0 ? (totalLinksSent / totalConversations * 100) : 0;
   const linkToBookedCR = totalLinksSent > 0 ? (totalBookedCalls / totalLinksSent * 100) : 0;
   const tcToScCR = triageLiveCalls > 0 ? (triageBookedSC / triageLiveCalls * 100) : 0;
+  const allOnCalendar = triageOnCalendar + closerOnCalendar;
+  const allHeld = triageLiveCalls + closerLiveCalls;
+  const allShowUpRate = allOnCalendar > 0 ? (allHeld / allOnCalendar * 100) : 0;
 
   return {
     totalOutbounds, totalInbounds, totalReplies, totalFollowUpsFirst, totalFollowUpsInConvo,
     totalQualified, totalPitched, totalLinksSent, totalBookedCalls, setterBookedTC, setterBookedSC, totalConversations,
+    replyRate, allShowUpRate,
     triageOnCalendar, triageLiveCalls, triageNoShows, triageShowUpRate, triageQualified, triageBookedSC,
     closerOnCalendar, closerLiveCalls, closerNoShows, closerShowUpRate,
     totalClosed, closeRate, totalRevenue, totalCashCollected, wireCash, totalCashWithWire,
@@ -211,6 +258,7 @@ function calculateMetrics(entries, wireTransfers = []) {
 
 export {
   DEFAULT_TEAM, ROLE_LABELS, ROLE_COLORS, MEMBER_COLORS,
+  WEEKLY_KPIS, DAILY_KPIS, getKpiColor, KPI_BG, KPI_TEXT,
   getTeam, saveTeam, addTeamMember, removeTeamMember,
   getEntries, addEntry, deleteEntry,
   getWireTransfers, addWireTransfer,
