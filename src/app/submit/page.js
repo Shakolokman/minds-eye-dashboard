@@ -42,8 +42,15 @@ const RadioGroup = ({ label, required, options, value, onChange }) => (
 export default function SubmitPage() {
   const [team, setTeam] = useState([]);
   const [selectedMember, setSelectedMember] = useState('');
+  const [selectedRole, setSelectedRole] = useState('');
   const [mounted, setMounted] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  // Members who can submit multiple report types
+  // Map: member name → array of allowed roles
+  const MULTI_ROLE = {
+    'Shako Lokman': ['closer', 'triager'],
+  };
 
   // Form state
   const [form, setForm] = useState({
@@ -62,13 +69,26 @@ export default function SubmitPage() {
   useEffect(() => { async function load() { setTeam(await getTeam()); setMounted(true); } load(); }, []);
 
   const member = team.find(m => m.id === selectedMember);
-  const role = member?.role;
+  const multiRoles = member ? MULTI_ROLE[member.name] : null;
+  const role = multiRoles ? selectedRole : member?.role;
+
+  // When selecting a member, auto-set role if single-role, clear if multi-role
+  const handleMemberSelect = (id) => {
+    setSelectedMember(id);
+    const m = team.find(t => t.id === id);
+    const mr = m ? MULTI_ROLE[m.name] : null;
+    if (mr) {
+      setSelectedRole(''); // force them to pick
+    } else {
+      setSelectedRole(m?.role || '');
+    }
+  };
 
   const updateForm = (key, val) => setForm(prev => ({ ...prev, [key]: val }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedMember) return;
+    if (!selectedMember || !role) return;
     await addEntry({ ...form, memberId: selectedMember, formType: role });
     setSubmitted(true);
     setTimeout(() => {
@@ -112,7 +132,7 @@ export default function SubmitPage() {
       <Field label="Who are you?" required>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {team.map(m => (
-            <button key={m.id} type="button" onClick={() => setSelectedMember(m.id)}
+            <button key={m.id} type="button" onClick={() => handleMemberSelect(m.id)}
               className={`flex items-center gap-2 p-3 rounded-xl border transition-all text-left ${
                 selectedMember === m.id ? 'bg-brand-gold/10 border-brand-gold/50' : 'bg-brand-darker border-brand-slate/30 hover:border-brand-slate/50'
               }`}>
@@ -121,12 +141,33 @@ export default function SubmitPage() {
               </div>
               <div>
                 <p className={`text-sm font-medium ${selectedMember === m.id ? 'text-brand-gold' : 'text-white'}`}>{m.name}</p>
-                <p className="text-xs text-brand-muted">{ROLE_LABELS[m.role]}</p>
+                <p className="text-xs text-brand-muted">{MULTI_ROLE[m.name] ? MULTI_ROLE[m.name].map(r => ROLE_LABELS[r]).join(' / ') : ROLE_LABELS[m.role]}</p>
               </div>
             </button>
           ))}
         </div>
       </Field>
+
+      {/* Role Picker for multi-role members */}
+      {member && multiRoles && (
+        <div className="mt-4 animate-fade-in">
+          <Field label="What type of report?" required>
+            <div className="flex gap-3">
+              {multiRoles.map(r => (
+                <button key={r} type="button" onClick={() => setSelectedRole(r)}
+                  className={`flex-1 py-3 rounded-xl text-sm font-medium border transition-all ${
+                    selectedRole === r ? 'bg-brand-gold/15 border-brand-gold/50 text-brand-gold' : 'bg-brand-darker border-brand-slate/40 text-brand-muted hover:border-brand-slate/60'
+                  }`}>
+                  {r === 'triager' && '📋 Triage Call'}
+                  {r === 'closer' && '💰 Sales Call'}
+                  {r === 'setter' && '📤 DM Setting'}
+                  {r === 'outbound' && '📤 Outbound'}
+                </button>
+              ))}
+            </div>
+          </Field>
+        </div>
+      )}
 
       {/* Form */}
       {role && (
