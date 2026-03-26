@@ -430,7 +430,7 @@ export default function Dashboard() {
                       <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
                       <div>
                         <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
-                        <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {onCal} calls</p>
+                        <p className="text-xs text-brand-muted">{ROLE_LABELS['triager']} · {onCal} calls</p>
                       </div>
                     </div>
                     <div className="grid grid-cols-5 gap-2">
@@ -497,7 +497,7 @@ export default function Dashboard() {
                       <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
                       <div>
                         <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
-                        <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {onCal} calls</p>
+                        <p className="text-xs text-brand-muted">{ROLE_LABELS['closer']} · {onCal} calls</p>
                       </div>
                       <div className="ml-auto text-right">
                         <p className="text-lg font-bold text-brand-gold">{fmtUSD(rev)}</p>
