@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie } from 'recharts';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, getDateRange, filterByDateRange, calculateMetrics, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, getStripePayments, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
 
 const fmt = (n) => typeof n === 'number' ? (n >= 1000 ? `${(n/1000).toFixed(1)}k` : n % 1 === 0 ? n.toString() : n.toFixed(1)) : '0';
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -19,6 +19,7 @@ export default function Dashboard() {
   const [team, setTeam] = useState([]);
   const [allEntries, setAllEntries] = useState([]);
   const [wireTransfers, setWireTransfers] = useState([]);
+  const [stripePayments, setStripePayments] = useState([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -26,13 +27,14 @@ export default function Dashboard() {
       setTeam(await getTeam());
       setAllEntries(await getEntries());
       setWireTransfers(await getWireTransfers());
+      setStripePayments(await getStripePayments());
       setMounted(true);
     }
     loadData();
   }, []);
 
-  const { filteredEntries, filteredWires } = useMemo(() => {
-    if (!mounted) return { filteredEntries: [], filteredWires: [] };
+  const { filteredEntries, filteredWires, filteredStripe } = useMemo(() => {
+    if (!mounted) return { filteredEntries: [], filteredWires: [], filteredStripe: [] };
     let start, end;
     if (preset === 'custom' && customStart && customEnd) {
       start = new Date(customStart + 'T00:00:00');
@@ -45,8 +47,9 @@ export default function Dashboard() {
     return {
       filteredEntries: filterByDateRange(allEntries, start, end),
       filteredWires: filterByDateRange(wireTransfers, start, end),
+      filteredStripe: filterByDateRange(stripePayments, start, end),
     };
-  }, [mounted, preset, customStart, customEnd, allEntries, wireTransfers]);
+  }, [mounted, preset, customStart, customEnd, allEntries, wireTransfers, stripePayments]);
 
   const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires), [filteredEntries, filteredWires]);
 
@@ -165,6 +168,35 @@ export default function Dashboard() {
     return team.filter(m => !submittedToday.has(m.id) && (m.role === 'setter' || m.role === 'outbound'));
   }, [allEntries, team, mounted]);
 
+  // Payment mismatch detection
+  const mismatches = useMemo(() => {
+    if (!mounted) return { closerNoPayment: [], paymentNoCloser: [] };
+    const closedDeals = filteredEntries.filter(e => e.formType === 'closer' && e.closed === 'yes');
+    return findMismatches(filteredStripe, closedDeals, team);
+  }, [mounted, filteredStripe, filteredEntries, team]);
+  const totalMismatches = mismatches.closerNoPayment.length + mismatches.paymentNoCloser.length;
+
+  // Stripe-to-closer email matching for per-closer cash tracking
+  const stripeCloserMatch = useMemo(() => {
+    if (!mounted) return new Map();
+    const closedDeals = allEntries.filter(e => e.formType === 'closer' && e.closed === 'yes');
+    return matchStripeToClosers(stripePayments, closedDeals, team);
+  }, [mounted, stripePayments, allEntries, team]);
+
+  // Per-closer Stripe cash: memberId → total Stripe $ matched to them
+  const closerStripeCash = useMemo(() => {
+    const map = {};
+    filteredStripe.forEach(p => {
+      if (p.status !== 'succeeded') return;
+      const match = stripeCloserMatch.get(p.stripePaymentId || p.id);
+      if (match?.entry?.memberId) {
+        const mid = match.entry.memberId;
+        map[mid] = (map[mid] || 0) + (parseFloat(p.amount) || 0);
+      }
+    });
+    return map;
+  }, [filteredStripe, stripeCloserMatch]);
+
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -219,6 +251,22 @@ export default function Dashboard() {
             <p className="text-amber-300 font-semibold text-sm">Missing EOD Reports Today</p>
             <p className="text-amber-200/70 text-xs mt-0.5">{missingToday.map(m => m.name).join(', ')} {missingToday.length === 1 ? 'has' : 'have'} not submitted today&apos;s report yet.</p>
           </div>
+        </div>
+      )}
+
+      {/* Payment Mismatch Alert */}
+      {totalMismatches > 0 && (
+        <div className="bg-rose-900/15 border border-rose-600/25 rounded-xl p-4 mb-6 flex items-start gap-3 animate-fade-in">
+          <span className="text-rose-400 text-lg">💳</span>
+          <div className="flex-1">
+            <p className="text-rose-300 font-semibold text-sm">Payment Mismatches ({totalMismatches})</p>
+            <p className="text-rose-200/60 text-xs mt-0.5">
+              {mismatches.closerNoPayment.length > 0 && `${mismatches.closerNoPayment.length} closer${mismatches.closerNoPayment.length === 1 ? '' : 's'} said Stripe but no payment found`}
+              {mismatches.closerNoPayment.length > 0 && mismatches.paymentNoCloser.length > 0 && ' · '}
+              {mismatches.paymentNoCloser.length > 0 && `${mismatches.paymentNoCloser.length} Stripe payment${mismatches.paymentNoCloser.length === 1 ? '' : 's'} with no closer entry`}
+            </p>
+          </div>
+          <a href="/payments" className="text-xs text-rose-300 hover:text-white transition-colors whitespace-nowrap">View details →</a>
         </div>
       )}
 
@@ -436,7 +484,9 @@ export default function Dashboard() {
                 const closedCount = closed.length;
                 const closeRate = live > 0 ? (closedCount / live * 100) : 0;
                 const rev = closed.reduce((s, e) => s + (parseFloat(e.totalDealSize) || 0), 0);
-                const cash = closed.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
+                const wireCash = closed.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
+                const stripeCash = closerStripeCash[member.id] || 0;
+                const totalCash = wireCash + stripeCash;
                 const pif = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('pif')).length;
                 const split = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('split')).length;
                 const deposit = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('deposit')).length;
@@ -463,7 +513,13 @@ export default function Dashboard() {
                     <div className="grid grid-cols-4 gap-2">
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Closed</p><p className="text-lg font-bold text-brand-gold">{closedCount}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Close %</p><p className="text-lg font-bold text-brand-gold">{fmtPct(closeRate)}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Cash</p><p className="text-lg font-bold text-white">{fmtUSD(cash)}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center">
+                        <p className="text-xs text-brand-muted font-semibold">Cash</p>
+                        <p className="text-lg font-bold text-white">{fmtUSD(totalCash)}</p>
+                        {stripeCash > 0 && wireCash > 0 && (
+                          <p className="text-[10px] text-brand-muted mt-0.5">💳{fmtUSD(stripeCash)} · 🏦{fmtUSD(wireCash)}</p>
+                        )}
+                      </div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">PIF/Spl/Dep</p><p className="text-lg font-bold text-white">{pif}/{split}/{deposit}</p></div>
                     </div>
                   </div>

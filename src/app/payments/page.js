@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, addWireTransfer, getStripePayments, getDateRange, filterByDateRange } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, addWireTransfer, getStripePayments, getDateRange, filterByDateRange, matchStripeToClosers, findMismatches } from '@/lib/store';
 
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
@@ -34,6 +34,7 @@ export default function PaymentsPage() {
   const [customEnd, setCustomEnd] = useState('');
   const [mounted, setMounted] = useState(false);
   const [showWireForm, setShowWireForm] = useState(false);
+  const [showMismatches, setShowMismatches] = useState(true);
   const [wireForm, setWireForm] = useState({ date: new Date().toISOString().split('T')[0], clientName: '', amount: '', collectedBy: '', notes: '' });
 
   useEffect(() => {
@@ -70,6 +71,19 @@ export default function PaymentsPage() {
     return s + cash;
   }, 0);
 
+  // Stripe-to-closer email matching
+  const stripeCloserMatch = useMemo(() => {
+    if (!mounted) return new Map();
+    const allCloserEntries = entries.filter(e => e.formType === 'closer' && e.closed === 'yes');
+    return matchStripeToClosers(stripePayments, allCloserEntries, team);
+  }, [mounted, stripePayments, entries, team]);
+
+  // Mismatch detection (use filtered data so it respects date range)
+  const mismatches = useMemo(() => {
+    if (!mounted) return { closerNoPayment: [], paymentNoCloser: [] };
+    return findMismatches(filteredStripe, closedDeals, team);
+  }, [mounted, filteredStripe, closedDeals, team]);
+
   // Stripe auto-imported (actual cash)
   const stripeSucceeded = filteredStripe.filter(p => p.status === 'succeeded');
   const stripeCash = stripeSucceeded.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
@@ -90,18 +104,22 @@ export default function PaymentsPage() {
 
   // Payment list — only actual cash sources (Stripe auto + Wire transfers + closer wire entries)
   const allPayments = [
-    ...filteredStripe.map(p => ({
-      type: 'stripe_auto',
-      date: p.date,
-      client: p.customerName || p.customerEmail || '—',
-      email: p.customerEmail,
-      amount: parseFloat(p.amount) || 0,
-      method: 'Stripe',
-      paymentType: TYPE_LABELS[p.paymentType] || p.paymentType,
-      status: p.status,
-      details: p.planName || TYPE_LABELS[p.paymentType] || '',
-      closer: '',
-    })),
+    ...filteredStripe.map(p => {
+      const match = stripeCloserMatch.get(p.stripePaymentId || p.id);
+      return {
+        type: 'stripe_auto',
+        date: p.date,
+        client: p.customerName || p.customerEmail || '—',
+        email: p.customerEmail,
+        amount: parseFloat(p.amount) || 0,
+        method: 'Stripe',
+        paymentType: TYPE_LABELS[p.paymentType] || p.paymentType,
+        status: p.status,
+        details: p.planName || TYPE_LABELS[p.paymentType] || '',
+        closer: match?.member?.name || '',
+        matchedEntry: match?.entry || null,
+      };
+    }),
     ...filteredWires.map(w => ({
       type: 'wire',
       date: w.date,
@@ -208,7 +226,7 @@ export default function PaymentsPage() {
           <p className="text-sm font-medium text-white">Stripe Integration</p>
           <p className="text-xs text-brand-muted">
             {stripePayments.length > 0
-              ? `${stripePayments.length} payment${stripePayments.length === 1 ? '' : 's'} imported automatically`
+              ? `${stripePayments.length} payment${stripePayments.length === 1 ? '' : 's'} imported · ${stripeCloserMatch.size} matched to closers`
               : 'Connected — payments will appear here automatically'}
           </p>
         </div>
@@ -216,6 +234,54 @@ export default function PaymentsPage() {
           Connected
         </span>
       </div>
+
+      {/* Mismatch Warnings */}
+      {showMismatches && (mismatches.closerNoPayment.length > 0 || mismatches.paymentNoCloser.length > 0) && (
+        <div className="mb-6 space-y-3 animate-fade-in">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
+              <span>⚠</span> Payment Mismatches ({mismatches.closerNoPayment.length + mismatches.paymentNoCloser.length})
+            </h3>
+            <button onClick={() => setShowMismatches(false)} className="text-xs text-brand-muted hover:text-white transition-colors">Dismiss</button>
+          </div>
+
+          {mismatches.closerNoPayment.length > 0 && (
+            <div className="bg-amber-900/15 border border-amber-600/25 rounded-xl p-4">
+              <p className="text-xs font-semibold text-amber-300 mb-2 uppercase tracking-wider">Closer said Stripe — no payment found</p>
+              <p className="text-xs text-amber-200/60 mb-3">These closer entries selected &quot;Stripe&quot; as payment method, but no matching Stripe payment was found by customer email.</p>
+              <div className="space-y-2">
+                {mismatches.closerNoPayment.map((m, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-brand-darker/50 rounded-lg px-3 py-2.5">
+                    <span className="text-amber-400 text-sm">💳❌</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{m.leadName} <span className="text-brand-muted text-xs">({m.leadEmail})</span></p>
+                      <p className="text-xs text-brand-muted">Closed by {m.memberName} · {new Date(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {mismatches.paymentNoCloser.length > 0 && (
+            <div className="bg-blue-900/15 border border-blue-600/25 rounded-xl p-4">
+              <p className="text-xs font-semibold text-blue-300 mb-2 uppercase tracking-wider">Stripe payment received — no closer entry</p>
+              <p className="text-xs text-blue-200/60 mb-3">These Stripe payments don&apos;t match any closer entry by customer email. The closer may not have submitted their report yet.</p>
+              <div className="space-y-2">
+                {mismatches.paymentNoCloser.map((m, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-brand-darker/50 rounded-lg px-3 py-2.5">
+                    <span className="text-blue-400 text-sm">📧❓</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white truncate">{m.customerName} <span className="text-brand-muted text-xs">({m.customerEmail})</span></p>
+                      <p className="text-xs text-brand-muted">{fmtUSD(m.amount)} · {new Date(m.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Payments Table */}
       <div className="bg-brand-surface border border-brand-slate/30 rounded-xl overflow-hidden">
@@ -267,7 +333,18 @@ export default function PaymentsPage() {
                     <td className="py-3 px-4 text-xs text-brand-muted max-w-[200px] truncate">
                       {p.planName || p.details || '—'}
                     </td>
-                    <td className="py-3 px-4 text-brand-muted">{p.closer || '—'}</td>
+                    <td className="py-3 px-4">
+                      {p.closer ? (
+                        <span className="text-white text-sm flex items-center gap-1.5">
+                          {p.type === 'stripe_auto' && p.matchedEntry && (
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" title="Matched by email" />
+                          )}
+                          {p.closer}
+                        </span>
+                      ) : (
+                        <span className="text-brand-muted">—</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

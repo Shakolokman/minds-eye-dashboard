@@ -285,6 +285,108 @@ async function getStripePayments() {
   }
 }
 
+// ============ STRIPE-TO-CLOSER EMAIL MATCHING ============
+
+/**
+ * Match Stripe payments to closer entries by customer email ↔ lead email.
+ * Returns a Map: stripePaymentId → { closerEntry, closerMember }
+ */
+function matchStripeToClosers(stripePayments, closerEntries, team) {
+  const matchMap = new Map(); // stripePaymentId → { entry, member }
+
+  // Build a lookup: lowercase email → array of closer entries
+  const emailToClosers = {};
+  closerEntries.forEach(entry => {
+    const email = (entry.leadEmail || '').toLowerCase().trim();
+    if (!email) return;
+    if (!emailToClosers[email]) emailToClosers[email] = [];
+    emailToClosers[email].push(entry);
+  });
+
+  stripePayments.forEach(payment => {
+    const email = (payment.customerEmail || '').toLowerCase().trim();
+    if (!email) return;
+    const closers = emailToClosers[email];
+    if (closers && closers.length > 0) {
+      // Pick the closest closer entry by date (prefer same day or most recent before payment)
+      const paymentDate = new Date(payment.date || payment.timestamp);
+      let best = closers[0];
+      let bestDiff = Infinity;
+      closers.forEach(c => {
+        const diff = Math.abs(new Date(c.date) - paymentDate);
+        if (diff < bestDiff) { bestDiff = diff; best = c; }
+      });
+      const member = team.find(m => m.id === best.memberId);
+      matchMap.set(payment.stripePaymentId || payment.id, {
+        entry: best,
+        member: member || { name: 'Unknown', color: '#8A9DAB' },
+      });
+    }
+  });
+
+  return matchMap;
+}
+
+/**
+ * Find mismatches between closer entries and Stripe payments.
+ * Returns:
+ *   closerNoPayment — closer said Stripe, but no matching Stripe payment found
+ *   paymentNoCloser — Stripe payment received, but no closer entry with that email
+ */
+function findMismatches(stripePayments, closerEntries, team) {
+  const stripeEmails = new Set(
+    stripePayments
+      .filter(p => p.status === 'succeeded')
+      .map(p => (p.customerEmail || '').toLowerCase().trim())
+      .filter(Boolean)
+  );
+
+  const closerEmails = new Set(
+    closerEntries
+      .filter(e => e.closed === 'yes')
+      .map(e => (e.leadEmail || '').toLowerCase().trim())
+      .filter(Boolean)
+  );
+
+  // Closer said "Stripe" but no Stripe payment found for that email
+  const closerNoPayment = closerEntries
+    .filter(e => {
+      if (e.closed !== 'yes') return false;
+      if (e.paymentMethod !== 'stripe') return false;
+      const email = (e.leadEmail || '').toLowerCase().trim();
+      return email && !stripeEmails.has(email);
+    })
+    .map(e => {
+      const member = team.find(m => m.id === e.memberId);
+      return {
+        type: 'closer_no_payment',
+        entry: e,
+        memberName: member?.name || 'Unknown',
+        leadName: e.leadName || '—',
+        leadEmail: e.leadEmail || '—',
+        date: e.date,
+      };
+    });
+
+  // Stripe payment received but no closer entry with that email
+  const paymentNoCloser = stripePayments
+    .filter(p => {
+      if (p.status !== 'succeeded') return false;
+      const email = (p.customerEmail || '').toLowerCase().trim();
+      return email && !closerEmails.has(email);
+    })
+    .map(p => ({
+      type: 'payment_no_closer',
+      payment: p,
+      customerName: p.customerName || '—',
+      customerEmail: p.customerEmail || '—',
+      amount: p.amount,
+      date: p.date,
+    }));
+
+  return { closerNoPayment, paymentNoCloser };
+}
+
 // ============ FILTERING (unchanged) ============
 
 function filterByDateRange(items, startDate, endDate, dateField = 'date') {
@@ -417,5 +519,6 @@ export {
   getEntries, addEntry, deleteEntry,
   getWireTransfers, addWireTransfer,
   getStripePayments,
+  matchStripeToClosers, findMismatches,
   filterByDateRange, getDateRange, calculateMetrics,
 };
