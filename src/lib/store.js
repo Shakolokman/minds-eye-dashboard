@@ -334,8 +334,11 @@ function matchStripeToClosers(stripePayments, closerEntries, team) {
  *   paymentNoCloser — Stripe payment received, but no closer entry with that email
  */
 function findMismatches(stripePayments, closerEntries, team) {
+  // Only consider high-ticket Stripe payments (>= $100) — skip workshops/low-ticket
+  const highTicketStripe = stripePayments.filter(p => (parseFloat(p.amount) || 0) >= 100);
+
   const stripeEmails = new Set(
-    stripePayments
+    highTicketStripe
       .filter(p => p.status === 'succeeded')
       .map(p => (p.customerEmail || '').toLowerCase().trim())
       .filter(Boolean)
@@ -368,8 +371,8 @@ function findMismatches(stripePayments, closerEntries, team) {
       };
     });
 
-  // Stripe payment received but no closer entry with that email
-  const paymentNoCloser = stripePayments
+  // Stripe payment received but no closer entry with that email (high-ticket only)
+  const paymentNoCloser = highTicketStripe
     .filter(p => {
       if (p.status !== 'succeeded') return false;
       const email = (p.customerEmail || '').toLowerCase().trim();
@@ -432,7 +435,7 @@ function getDateRange(preset) {
 
 // ============ METRICS CALCULATION (unchanged) ============
 
-function calculateMetrics(entries, wireTransfers = []) {
+function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const setterEntries = entries.filter(e => e.formType === 'setter');
   const outboundEntries = entries.filter(e => e.formType === 'outbound');
   const triageEntries = entries.filter(e => e.formType === 'triage' || e.formType === 'triager');
@@ -481,10 +484,15 @@ function calculateMetrics(entries, wireTransfers = []) {
     return s + Math.max(0, cash);
   }, 0);
   const wireCash = wireTransfers.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
+  // Stripe cash from auto-imported payments (>= $100 to exclude low-ticket workshops)
+  const stripeCashTotal = stripePayments
+    .filter(p => p.status === 'succeeded' && (parseFloat(p.amount) || 0) >= 100)
+    .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
   const totalCashWithWire = totalCashCollected + wireCash;
-  const avgCashPerClose = totalClosed > 0 ? totalCashWithWire / totalClosed : 0;
+  const allCashTotal = totalCashWithWire + stripeCashTotal;
+  const avgCashPerClose = totalClosed > 0 ? allCashTotal / totalClosed : 0;
   const avgRevPerClose = totalClosed > 0 ? totalRevenue / totalClosed : 0;
-  const cashToRevPercent = totalRevenue > 0 ? (totalCashWithWire / totalRevenue * 100) : 0;
+  const cashToRevPercent = totalRevenue > 0 ? (allCashTotal / totalRevenue * 100) : 0;
 
   const pifDeals = closedDeals.filter(e => e.paymentType === 'pif' || (e.paymentDetails || '').toLowerCase().includes('pif')).length;
   const splitDeals = closedDeals.filter(e => e.paymentType === 'split' || (e.paymentDetails || '').toLowerCase().includes('split')).length;
@@ -505,7 +513,7 @@ function calculateMetrics(entries, wireTransfers = []) {
     replyRate, allShowUpRate,
     triageOnCalendar, triageLiveCalls, triageNoShows, triageShowUpRate, triageQualified, triageBookedSC,
     closerOnCalendar, closerLiveCalls, closerNoShows, closerShowUpRate,
-    totalClosed, closeRate, totalRevenue, totalCashCollected, wireCash, totalCashWithWire,
+    totalClosed, closeRate, totalRevenue, totalCashCollected, wireCash, stripeCashTotal, totalCashWithWire, allCashTotal,
     avgCashPerClose, avgRevPerClose, cashToRevPercent,
     pifDeals, splitDeals, depositDeals,
     dmToLinkCR, linkToBookedCR, tcToScCR,

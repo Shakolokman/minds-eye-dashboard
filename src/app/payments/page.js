@@ -106,18 +106,21 @@ export default function PaymentsPage() {
   const allPayments = [
     ...filteredStripe.map(p => {
       const match = stripeCloserMatch.get(p.stripePaymentId || p.id);
+      const amount = parseFloat(p.amount) || 0;
+      const isLowTicket = amount < 100;
       return {
         type: 'stripe_auto',
         date: p.date,
         client: p.customerName || p.customerEmail || '—',
         email: p.customerEmail,
-        amount: parseFloat(p.amount) || 0,
+        amount: amount,
         method: 'Stripe',
         paymentType: TYPE_LABELS[p.paymentType] || p.paymentType,
         status: p.status,
-        details: p.planName || TYPE_LABELS[p.paymentType] || '',
-        closer: match?.member?.name || '',
+        details: isLowTicket ? 'Workshop/LT' : (p.planName || TYPE_LABELS[p.paymentType] || ''),
+        closer: isLowTicket ? 'Workshop/LT' : (match?.member?.name || ''),
         matchedEntry: match?.entry || null,
+        isLowTicket,
       };
     }),
     ...filteredWires.map(w => ({
@@ -335,8 +338,8 @@ export default function PaymentsPage() {
                     </td>
                     <td className="py-3 px-4">
                       {p.closer ? (
-                        <span className="text-white text-sm flex items-center gap-1.5">
-                          {p.type === 'stripe_auto' && p.matchedEntry && (
+                        <span className={`text-sm flex items-center gap-1.5 ${p.isLowTicket ? 'text-brand-muted italic' : 'text-white'}`}>
+                          {p.type === 'stripe_auto' && p.matchedEntry && !p.isLowTicket && (
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" title="Matched by email" />
                           )}
                           {p.closer}
