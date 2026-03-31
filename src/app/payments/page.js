@@ -214,12 +214,12 @@ export default function PaymentsPage() {
 
       {/* Payment Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-        <StatCard label="Total Revenue" value={fmtUSD(totalRevenue)} highlight icon="💰" subtitle={`${closedDeals.length} deal${closedDeals.length === 1 ? '' : 's'} closed`} />
-        <StatCard label="Stripe Cash" value={fmtUSD(stripeCash)} icon="💳" subtitle={`${stripeSucceeded.length} payment${stripeSucceeded.length === 1 ? '' : 's'}`} />
+        <StatCard label="Stripe Cash" value={fmtUSD(stripeCash)} highlight icon="💳" subtitle={`${stripeSucceeded.length} payment${stripeSucceeded.length === 1 ? '' : 's'}`} />
         <StatCard label="Wire Cash" value={fmtUSD(wireCash + closerWireCash)} icon="🏦" subtitle={`${filteredWires.length + closedDeals.filter(e => e.paymentMethod === 'wire').length} transfer${filteredWires.length === 1 ? '' : 's'}`} />
         <StatCard label="Refunds" value={fmtUSD(refundTotal)} icon="↩️" subtitle={`${stripeRefunds.length} refund${stripeRefunds.length === 1 ? '' : 's'}`} />
-        <StatCard label="Total Cash" value={fmtUSD(netCash)} highlight icon="💵" />
-        <StatCard label="Cash / Revenue" value={totalRevenue > 0 ? `${(netCash / totalRevenue * 100).toFixed(1)}%` : '—'} icon="📊" />
+        <StatCard label="Total Cash" value={fmtUSD(netCash)} highlight icon="💵" subtitle="All sources, net of refunds" />
+        <StatCard label="Deal Value" value={fmtUSD(totalRevenue)} icon="📋" subtitle={closedDeals.length > 0 ? `from ${closedDeals.length} close${closedDeals.length === 1 ? '' : 's'} (EOD reports)` : 'from closer EOD reports'} />
+        <StatCard label="Collection Rate" value={totalRevenue > 0 ? `${(netCash / totalRevenue * 100).toFixed(1)}%` : '—'} icon="📊" subtitle="cash ÷ deal value" />
       </div>
 
       {/* Stripe Status Banner */}
