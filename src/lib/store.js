@@ -256,6 +256,19 @@ async function addWireTransfer(transfer) {
   }
 }
 
+async function deleteWireTransfer(id) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase
+      .from('wire_transfers')
+      .delete()
+      .eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('deleteWireTransfer error:', err);
+  }
+}
+
 // Stripe Payments (read-only — populated by webhook)
 async function getStripePayments() {
   if (!supabase) return [];
@@ -525,7 +538,7 @@ export {
   WEEKLY_KPIS, DAILY_KPIS, getKpiColor, KPI_BG, KPI_TEXT,
   getTeam, saveTeam, addTeamMember, removeTeamMember, updateTeamMemberRole,
   getEntries, addEntry, deleteEntry,
-  getWireTransfers, addWireTransfer,
+  getWireTransfers, addWireTransfer, deleteWireTransfer,
   getStripePayments,
   matchStripeToClosers, findMismatches,
   filterByDateRange, getDateRange, calculateMetrics,

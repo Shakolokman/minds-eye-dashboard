@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, addWireTransfer, getStripePayments, getDateRange, filterByDateRange, matchStripeToClosers, findMismatches } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, addWireTransfer, deleteWireTransfer, deleteEntry, getStripePayments, getDateRange, filterByDateRange, matchStripeToClosers, findMismatches } from '@/lib/store';
 
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
@@ -125,6 +125,7 @@ export default function PaymentsPage() {
     }),
     ...filteredWires.map(w => ({
       type: 'wire',
+      sourceId: w.id,
       date: w.date,
       client: w.clientName,
       email: '',
@@ -137,6 +138,7 @@ export default function PaymentsPage() {
     })),
     ...closedDeals.filter(e => e.paymentMethod === 'wire').map(e => ({
       type: 'closer_wire',
+      sourceId: e.id,
       date: e.date,
       client: e.leadName,
       email: e.leadEmail,
@@ -155,6 +157,19 @@ export default function PaymentsPage() {
     setWires(await getWireTransfers());
     setWireForm({ date: new Date().toISOString().split('T')[0], clientName: '', amount: '', collectedBy: '', notes: '' });
     setShowWireForm(false);
+  };
+
+  const handleDeletePayment = async (payment) => {
+    const label = `${payment.client} — $${(payment.amount || 0).toLocaleString()}`;
+    if (!confirm(`Delete payment: ${label}?\n\nThis cannot be undone.`)) return;
+
+    if (payment.type === 'wire') {
+      await deleteWireTransfer(payment.sourceId);
+      setWires(await getWireTransfers());
+    } else if (payment.type === 'closer_wire') {
+      await deleteEntry(payment.sourceId);
+      setEntries(await getEntries());
+    }
   };
 
   const hasStripeIntegration = stripePayments.length > 0;
@@ -307,6 +322,7 @@ export default function PaymentsPage() {
                   <th className="text-right py-3 px-4">Amount</th>
                   <th className="text-left py-3 px-4">Details</th>
                   <th className="text-left py-3 px-4">Closer</th>
+                  <th className="text-right py-3 px-3 w-10"></th>
                 </tr>
               </thead>
               <tbody>
@@ -346,6 +362,14 @@ export default function PaymentsPage() {
                         </span>
                       ) : (
                         <span className="text-brand-muted">—</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-3 text-right">
+                      {(p.type === 'wire' || p.type === 'closer_wire') && p.sourceId && (
+                        <button onClick={() => handleDeletePayment(p)}
+                          className="text-brand-muted hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-400/10" title="Delete payment">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
                       )}
                     </td>
                   </tr>
