@@ -484,9 +484,21 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const totalRevenue = closedDeals.reduce((s, e) => {
     const dealSize = parseFloat(e.totalDealSize) || 0;
     const cash = parseFloat(e.cashCollected) || 0;
-    // Use deal size if provided
+    // Use deal size if provided (Stripe Split, Wire, or manually entered)
     if (dealSize > 0) return s + dealSize;
-    // Fallback to cash collected
+    // For Stripe PIF with no deal size, find matching Stripe payment amount
+    if (e.paymentMethod === 'stripe' && e.paymentType === 'pif') {
+      const email = (e.leadEmail || '').toLowerCase().trim();
+      if (email) {
+        const matchedPayment = stripePayments.find(p =>
+          p.status === 'succeeded' &&
+          (p.customerEmail || '').toLowerCase().trim() === email
+        );
+        if (matchedPayment) return s + (parseFloat(matchedPayment.amount) || 0);
+      }
+      return s; // No match found, skip
+    }
+    // Fallback to cash collected (wire entries from old data)
     if (cash > 0) return s + cash;
     return s;
   }, 0);
