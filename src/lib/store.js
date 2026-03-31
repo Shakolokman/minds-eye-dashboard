@@ -484,11 +484,9 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const totalRevenue = closedDeals.reduce((s, e) => {
     const dealSize = parseFloat(e.totalDealSize) || 0;
     const cash = parseFloat(e.cashCollected) || 0;
-    // For Stripe PIF, no manual deal size — skip, Stripe handles it
-    if (e.paymentMethod === 'stripe' && e.paymentType === 'pif') return s;
-    // For deals with deal size entered, use it (ignore negatives)
+    // Use deal size if provided
     if (dealSize > 0) return s + dealSize;
-    // For wire with cash but no deal size, use cash
+    // Fallback to cash collected
     if (cash > 0) return s + cash;
     return s;
   }, 0);
