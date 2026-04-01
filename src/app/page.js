@@ -455,7 +455,7 @@ export default function Dashboard() {
         <StatCard label="Held SC" value={metrics.closerLiveCalls} icon="✅" />
         <StatCard label="Show-Up Rate SC" value={fmtPct(metrics.closerShowUpRate)} icon="📈" />
         <StatCard label="Deals Closed" value={metrics.totalClosed} highlight icon="🏆" />
-        <StatCard label="Close Rate" value={fmtPct(metrics.closeRate)} icon="🎯" kpiColor={kc.closeRate} target="30%" />
+        <StatCard label="Close Rate" value={fmtPct(metrics.closeRate)} icon="🎯" kpiColor={kc.closeRate} target="30%" subtitle="live calls only" />
       </div>
 
       {/* Individual Closer Performance */}
