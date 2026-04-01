@@ -468,14 +468,14 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
 
   const triageLiveCalls = triageEntries.filter(e => e.showUp === 'live').length;
   const triageNoShows = triageEntries.filter(e => e.showUp === 'noshow').length;
-  const triageOnCalendar = triageEntries.length;
+  const triageOnCalendar = triageEntries.filter(e => e.showUp === 'live' || e.showUp === 'noshow').length;
   const triageShowUpRate = triageOnCalendar > 0 ? (triageLiveCalls / triageOnCalendar * 100) : 0;
   const triageQualified = triageEntries.filter(e => e.qualified === 'yes').length;
   const triageBookedSC = triageEntries.filter(e => e.bookedForSC === 'yes').length;
 
   const closerLiveCalls = closerEntries.filter(e => e.showUp === 'live').length;
   const closerNoShows = closerEntries.filter(e => e.showUp === 'noshow').length;
-  const closerOnCalendar = closerEntries.length;
+  const closerOnCalendar = closerEntries.filter(e => e.showUp === 'live' || e.showUp === 'noshow').length;
   const closerShowUpRate = closerOnCalendar > 0 ? (closerLiveCalls / closerOnCalendar * 100) : 0;
   const closedDeals = closerEntries.filter(e => e.closed === 'yes');
   const totalClosed = closedDeals.length;

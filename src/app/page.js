@@ -107,7 +107,7 @@ export default function Dashboard() {
     links: getKpiColor(metrics.totalLinksSent, kpi.linksSent),
     booked: getKpiColor(metrics.totalBookedCalls, kpi.totalBooked),
     replyRate: getKpiColor(metrics.replyRate, kpi.replyRate),
-    showUp: getKpiColor(metrics.allShowUpRate, kpi.showUpRate),
+    showUp: getKpiColor(metrics.triageShowUpRate, kpi.showUpRate),
     closeRate: getKpiColor(metrics.closeRate, kpi.closeRate),
     revenue: getKpiColor(metrics.totalRevenue, kpi.revenue),
   };
@@ -393,7 +393,7 @@ export default function Dashboard() {
         <StatCard label="On Calendar TC" value={metrics.triageOnCalendar} icon="📋" />
         <StatCard label="Held TC" value={metrics.triageLiveCalls} icon="✅" />
         <StatCard label="No Shows TC" value={metrics.triageNoShows} icon="❌" />
-        <StatCard label="Show-Up Rate (All)" value={fmtPct(metrics.allShowUpRate)} icon="📈" kpiColor={kc.showUp} target="80%" />
+        <StatCard label="Show-Up Rate TC" value={fmtPct(metrics.triageShowUpRate)} icon="📈" kpiColor={kc.showUp} target="80%" />
         <StatCard label="TC→SC CR" value={fmtPct(metrics.tcToScCR)} icon="🔄" />
         <StatCard label="Qualified" value={metrics.triageQualified} icon="⭐" />
         <StatCard label="Sales Calls Booked" value={metrics.triageBookedSC} highlight icon="🎯" />
