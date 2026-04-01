@@ -35,7 +35,16 @@ export default function PaymentsPage() {
   const [mounted, setMounted] = useState(false);
   const [showWireForm, setShowWireForm] = useState(false);
   const [showMismatches, setShowMismatches] = useState(true);
+  const [dismissedMismatchKey, setDismissedMismatchKey] = useState('');
   const [wireForm, setWireForm] = useState({ date: new Date().toISOString().split('T')[0], clientName: '', amount: '', collectedBy: '', notes: '' });
+
+  // Load dismissed state from localStorage on mount
+  useEffect(() => {
+    try {
+      const dismissed = localStorage.getItem('me_dismissed_mismatches');
+      if (dismissed) setDismissedMismatchKey(dismissed);
+    } catch {}
+  }, []);
 
   useEffect(() => {
     async function load() {
@@ -83,6 +92,25 @@ export default function PaymentsPage() {
     if (!mounted) return { closerNoPayment: [], paymentNoCloser: [] };
     return findMismatches(filteredStripe, closedDeals, team);
   }, [mounted, filteredStripe, closedDeals, team]);
+
+  // Generate a key from current mismatches so dismiss persists but reappears for NEW mismatches
+  const currentMismatchKey = useMemo(() => {
+    const parts = [
+      ...mismatches.closerNoPayment.map(m => `c:${m.leadEmail}:${m.date}`),
+      ...mismatches.paymentNoCloser.map(m => `p:${m.customerEmail}:${m.date}`),
+    ].sort().join('|');
+    return parts || '';
+  }, [mismatches]);
+
+  // Show mismatches if there are any AND they haven't been dismissed
+  const shouldShowMismatches = (mismatches.closerNoPayment.length > 0 || mismatches.paymentNoCloser.length > 0) 
+    && currentMismatchKey !== dismissedMismatchKey;
+
+  const handleDismissMismatches = () => {
+    setDismissedMismatchKey(currentMismatchKey);
+    setShowMismatches(false);
+    try { localStorage.setItem('me_dismissed_mismatches', currentMismatchKey); } catch {}
+  };
 
   // Stripe auto-imported (actual cash)
   const stripeSucceeded = filteredStripe.filter(p => p.status === 'succeeded');
@@ -254,13 +282,13 @@ export default function PaymentsPage() {
       </div>
 
       {/* Mismatch Warnings */}
-      {showMismatches && (mismatches.closerNoPayment.length > 0 || mismatches.paymentNoCloser.length > 0) && (
+      {shouldShowMismatches && (
         <div className="mb-6 space-y-3 animate-fade-in">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-amber-300 flex items-center gap-2">
               <span>⚠</span> Payment Mismatches ({mismatches.closerNoPayment.length + mismatches.paymentNoCloser.length})
             </h3>
-            <button onClick={() => setShowMismatches(false)} className="text-xs text-brand-muted hover:text-white transition-colors">Dismiss</button>
+            <button onClick={handleDismissMismatches} className="text-xs text-brand-muted hover:text-white transition-colors">Dismiss</button>
           </div>
 
           {mismatches.closerNoPayment.length > 0 && (
