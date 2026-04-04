@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, addWireTransfer, deleteWireTransfer, deleteEntry, getStripePayments, getDateRange, filterByDateRange, matchStripeToClosers, findMismatches } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, addWireTransfer, deleteWireTransfer, deleteEntry, getStripePayments, getDateRange, filterByDateRange, matchStripeToClosers, findMismatches, calculateMetrics } from '@/lib/store';
 
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
@@ -70,15 +70,10 @@ export default function PaymentsPage() {
     };
   }, [mounted, entries, wires, stripePayments, preset, customStart, customEnd]);
 
-  // Deal revenue from closer entries (NOT payments — this is contract value)
+  // Deal revenue from shared calculateMetrics (consistent with dashboard)
+  const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires, filteredStripe), [filteredEntries, filteredWires, filteredStripe]);
   const closedDeals = filteredEntries.filter(e => e.formType === 'closer' && e.closed === 'yes');
-  const totalRevenue = closedDeals.reduce((s, e) => {
-    const dealSize = parseFloat(e.totalDealSize) || 0;
-    const cash = parseFloat(e.cashCollected) || 0;
-    if (e.paymentMethod === 'stripe' && e.paymentType === 'pif') return s + cash;
-    if (dealSize > 0) return s + dealSize;
-    return s + cash;
-  }, 0);
+  const totalRevenue = metrics.totalRevenue;
 
   // Stripe-to-closer email matching
   const stripeCloserMatch = useMemo(() => {
