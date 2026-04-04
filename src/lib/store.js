@@ -496,9 +496,9 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
         );
         if (matchedPayment) return s + (parseFloat(matchedPayment.amount) || 0);
       }
-      return s; // No match found, skip
+      // No Stripe match — fall through to cash/wire fallback below
     }
-    // Fallback to cash collected (wire entries from old data)
+    // Fallback to cash collected from closer entry
     if (cash > 0) return s + cash;
     return s;
   }, 0);
