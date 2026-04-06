@@ -270,185 +270,20 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* DM Setting Performance */}
-      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">DM Setting Performance</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-        <StatCard label="Total Outbounds" value={fmt(metrics.totalOutbounds)} icon="📤" kpiColor={kc.outbounds} target={Math.round(kpi.totalOutbounds)} />
-        <StatCard label="Total Inbounds" value={fmt(metrics.totalInbounds)} icon="📥" />
-        <StatCard label="Reply Rate" value={fmtPct(metrics.replyRate)} icon="💬" kpiColor={kc.replyRate} target="30%" subtitle={`${fmt(metrics.totalReplies)} replies`} />
-        <StatCard label="Follow Ups (1st)" value={fmt(metrics.totalFollowUpsFirst)} icon="🔄" />
-        <StatCard label="Follow Ups (Convo)" value={fmt(metrics.totalFollowUpsInConvo)} icon="🔁" kpiColor={kc.followUpsConvo} target={Math.round(kpi.followUpsInConvo)} />
-        <StatCard label="Qualified Convos" value={fmt(metrics.totalQualified)} icon="✅" />
-        <StatCard label="Pitched Calls" value={fmt(metrics.totalPitched)} icon="📞" kpiColor={kc.pitched} target={Math.round(kpi.pitchedCalls)} />
-        <StatCard label="Links Sent" value={fmt(metrics.totalLinksSent)} icon="🔗" kpiColor={kc.links} target={Math.round(kpi.linksSent)} />
-        <StatCard label="Total Booked" value={fmt(metrics.totalBookedCalls)} icon="📅" kpiColor={kc.booked} target={Math.round(kpi.totalBooked)} subtitle={`${metrics.setterBookedTC} TC · ${metrics.setterBookedSC} SC`} />
-        <StatCard label="DM→Link CR" value={fmtPct(metrics.dmToLinkCR)} icon="📊" />
-        <StatCard label="Link→Booked CR" value={fmtPct(metrics.linkToBookedCR)} icon="📊" />
+      {/* ===== 1. REVENUE & PAYMENTS (moved to top) ===== */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Revenue & Payments</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
+        <StatCard label="Total Revenue" value={fmtUSD(metrics.totalRevenue)} icon="💰" kpiColor={kc.revenue} target={fmtUSD(Math.round(kpi.revenue))} />
+        <StatCard label="Cash Collected" value={fmtUSD(metrics.allCashTotal)} icon="💵" subtitle={metrics.stripeCashTotal > 0 ? `💳${fmtUSD(metrics.stripeCashTotal)} Stripe · 🏦${fmtUSD(metrics.totalCashWithWire)} close+wire` : undefined} />
+        <StatCard label="AVG Cash/Close" value={fmtUSD(metrics.avgCashPerClose)} icon="📊" />
+        <StatCard label="AVG Rev/Close" value={fmtUSD(metrics.avgRevPerClose)} icon="📊" />
+        <StatCard label="Cash to Rev %" value={fmtPct(metrics.cashToRevPercent)} icon="🔄" />
+        <StatCard label="PIF Deals" value={metrics.pifDeals} icon="✅" />
+        <StatCard label="Split Pay" value={metrics.splitDeals} icon="📋" />
+        <StatCard label="Deposit Close" value={metrics.depositDeals} icon="📝" />
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Pipeline Funnel */}
-        <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-white mb-4">Pipeline Funnel</h3>
-          <div className="space-y-2">
-            {funnelData.map((item, i) => {
-              const maxVal = Math.max(...funnelData.map(d => d.value), 1);
-              const width = Math.max((item.value / maxVal) * 100, 2);
-              return (
-                <div key={item.name} className="flex items-center gap-3 animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
-                  <span className="text-xs text-brand-muted w-20 text-right">{item.name}</span>
-                  <div className="flex-1 bg-brand-darker rounded-full h-7 overflow-hidden">
-                    <div
-                      className="h-full rounded-full flex items-center px-3 transition-all duration-700"
-                      style={{ width: `${width}%`, backgroundColor: item.fill }}
-                    >
-                      <span className="text-xs font-bold text-brand-darkest">{item.value}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Activity Over Time */}
-        <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-white mb-4">Outbound Activity Over Time</h3>
-          {dailyData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={dailyData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#3A4D58" />
-                <XAxis dataKey="date" tick={{ fill: '#8A9DAB', fontSize: 11 }} />
-                <YAxis tick={{ fill: '#8A9DAB', fontSize: 11 }} />
-                <Tooltip content={<CustomTooltip />} />
-                <Line type="monotone" dataKey="outbounds" stroke={CHART_GOLD} strokeWidth={2} dot={{ fill: CHART_GOLD, r: 3 }} name="Outbounds" />
-                <Line type="monotone" dataKey="inbounds" stroke="#6EE1A8" strokeWidth={2} dot={{ fill: '#6EE1A8', r: 3 }} name="Inbounds" />
-                <Line type="monotone" dataKey="replies" stroke="#A86EE1" strokeWidth={2} dot={{ fill: '#A86EE1', r: 3 }} name="Replies" />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[250px] flex items-center justify-center text-brand-muted text-sm">No activity data yet</div>
-          )}
-        </div>
-      </div>
-
-      {/* Individual DM Setter / Outbound Performance — under DM Setting section */}
-      {(() => {
-        // Get current team members with setter/outbound role + any members from entries in this period
-        const currentSetterIds = new Set(team.filter(m => m.role === 'setter' || m.role === 'outbound').map(m => m.id));
-        const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'setter' || e.formType === 'outbound').map(e => e.memberId));
-        const allIds = new Set([...currentSetterIds, ...entryMemberIds]);
-        if (allIds.size === 0) return null;
-
-        // Build member info — use team data if available, fallback for removed members
-        const members = [...allIds].map(id => {
-          const m = team.find(t => t.id === id);
-          return m || { id, name: 'Former Member', role: 'setter', color: '#8A9DAB' };
-        });
-
-        return (
-          <>
-            <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Individual DM Setter / Outbound</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
-              {members.map(member => {
-                const memberEntries = filteredEntries.filter(e => e.memberId === member.id && (e.formType === 'setter' || e.formType === 'outbound'));
-                const out = memberEntries.reduce((s, e) => s + (parseInt(e.outbounds) || 0), 0);
-                const rep = memberEntries.reduce((s, e) => s + (parseInt(e.replies) || 0), 0);
-                const fu1 = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsFirst) || 0), 0);
-                const fuc = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsInConvo) || 0), 0);
-                const links = memberEntries.reduce((s, e) => s + (parseInt(e.bookingLinksSent) || 0), 0);
-                const btc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedTC) || 0), 0);
-                const bsc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedSC) || 0), 0);
-                const daysWorked = memberEntries.length;
-                const isRemoved = !team.find(t => t.id === member.id);
-                return (
-                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
-                      <div>
-                        <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
-                        <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {daysWorked} days reported</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Outbounds</p><p className="text-lg font-bold text-white">{out}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Replies</p><p className="text-lg font-bold text-white">{rep}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Links Sent</p><p className="text-lg font-bold text-white">{links}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (1st)</p><p className="text-lg font-bold text-white">{fu1}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC Booked</p><p className="text-lg font-bold text-brand-gold">{btc}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bsc}</p></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        );
-      })()}
-
-      {/* Triage Metrics */}
-      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Triage Performance</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-        <StatCard label="On Calendar TC" value={metrics.triageOnCalendar} icon="📋" />
-        <StatCard label="Held TC" value={metrics.triageLiveCalls} icon="✅" />
-        <StatCard label="No Shows TC" value={metrics.triageNoShows} icon="❌" />
-        <StatCard label="Show-Up Rate TC" value={fmtPct(metrics.triageShowUpRate)} icon="📈" kpiColor={kc.showUp} target="80%" />
-        <StatCard label="TC→SC CR" value={fmtPct(metrics.tcToScCR)} icon="🔄" />
-        <StatCard label="Qualified" value={metrics.triageQualified} icon="⭐" />
-        <StatCard label="Sales Calls Booked" value={metrics.triageBookedSC} highlight icon="🎯" />
-      </div>
-
-      {/* Individual Triager Performance */}
-      {(() => {
-        const currentTriagerIds = new Set(team.filter(m => m.role === 'triager').map(m => m.id));
-        const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'triager' || e.formType === 'triage').map(e => e.memberId));
-        const allIds = new Set([...currentTriagerIds, ...entryMemberIds]);
-        if (allIds.size === 0) return null;
-
-        const members = [...allIds].map(id => {
-          const m = team.find(t => t.id === id);
-          return m || { id, name: 'Former Member', role: 'triager', color: '#8A9DAB' };
-        });
-
-        return (
-          <>
-            <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Individual Triager</h3>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-              {members.map(member => {
-                const memberEntries = filteredEntries.filter(e => e.memberId === member.id && (e.formType === 'triager' || e.formType === 'triage'));
-                const onCal = memberEntries.length;
-                const live = memberEntries.filter(e => e.showUp === 'live').length;
-                const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
-                const showRate = onCal > 0 ? (live / onCal * 100) : 0;
-                const qual = memberEntries.filter(e => e.qualified === 'yes').length;
-                const bookedSC = memberEntries.filter(e => e.bookedForSC === 'yes').length;
-                const isRemoved = !team.find(t => t.id === member.id);
-                return (
-                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
-                      <div>
-                        <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
-                        <p className="text-xs text-brand-muted">{ROLE_LABELS['triager']} · {onCal} calls</p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-5 gap-2">
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Qualified</p><p className="text-lg font-bold text-brand-gold">{qual}</p></div>
-                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bookedSC}</p></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        );
-      })()}
-
-      {/* Closer Metrics */}
+      {/* ===== 2. CLOSER PERFORMANCE ===== */}
       <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Closer Performance</h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         <StatCard label="On Calendar SC" value={metrics.closerOnCalendar} icon="📋" />
@@ -530,20 +365,210 @@ export default function Dashboard() {
         );
       })()}
 
-      {/* Revenue & Payments */}
-      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Revenue & Payments</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-        <StatCard label="Total Revenue" value={fmtUSD(metrics.totalRevenue)} icon="💰" kpiColor={kc.revenue} target={fmtUSD(Math.round(kpi.revenue))} />
-        <StatCard label="Cash Collected" value={fmtUSD(metrics.allCashTotal)} icon="💵" subtitle={metrics.stripeCashTotal > 0 ? `💳${fmtUSD(metrics.stripeCashTotal)} Stripe · 🏦${fmtUSD(metrics.totalCashWithWire)} close+wire` : undefined} />
-        <StatCard label="AVG Cash/Close" value={fmtUSD(metrics.avgCashPerClose)} icon="📊" />
-        <StatCard label="AVG Rev/Close" value={fmtUSD(metrics.avgRevPerClose)} icon="📊" />
-        <StatCard label="Cash to Rev %" value={fmtPct(metrics.cashToRevPercent)} icon="🔄" />
-        <StatCard label="PIF Deals" value={metrics.pifDeals} icon="✅" />
-        <StatCard label="Split Pay" value={metrics.splitDeals} icon="📋" />
-        <StatCard label="Deposit Close" value={metrics.depositDeals} icon="📝" />
+      {/* ===== 3. ALL CALLS BOOKED (NEW) ===== */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">All Calls Booked</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <StatCard label="Total Calls Booked" value={metrics.allCallsBooked} highlight icon="📞" />
+        <StatCard label="From DM Setting" value={metrics.totalBookedCalls} icon="💬" subtitle={`${metrics.setterBookedTC} TC · ${metrics.setterBookedSC} SC`} />
+        <StatCard label="From Other Sources" value={metrics.trackerTotalCalls} icon="📊" />
+      </div>
+      {metrics.trackerTotalCalls > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+          {[
+            { key: 'workshopOrganic', label: 'Workshop (Organic)', icon: '🎓' },
+            { key: 'workshopAds', label: 'Workshop (Ads)', icon: '📢' },
+            { key: 'auditAds', label: 'Audit Ads', icon: '🔍' },
+            { key: 'linkInBio', label: 'Link in Bio', icon: '🔗' },
+            { key: 'youtube', label: 'YouTube', icon: '▶️' },
+            { key: 'email', label: 'Email', icon: '📧' },
+            { key: 'linkedinOutbound', label: 'LinkedIn Outbound', icon: '💼' },
+            { key: 'referral', label: 'Referral', icon: '🤝' },
+          ].filter(s => (metrics.callsBySource[s.key] || 0) > 0).map(s => (
+            <div key={s.key} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-4 text-center">
+              <p className="text-xs text-brand-muted font-semibold mb-1">{s.icon} {s.label}</p>
+              <p className="text-2xl font-bold text-white">{metrics.callsBySource[s.key]}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ===== 4. TRIAGE PERFORMANCE ===== */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Triage Performance</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <StatCard label="On Calendar TC" value={metrics.triageOnCalendar} icon="📋" />
+        <StatCard label="Held TC" value={metrics.triageLiveCalls} icon="✅" />
+        <StatCard label="No Shows TC" value={metrics.triageNoShows} icon="❌" />
+        <StatCard label="Show-Up Rate TC" value={fmtPct(metrics.triageShowUpRate)} icon="📈" kpiColor={kc.showUp} target="80%" />
+        <StatCard label="TC→SC CR" value={fmtPct(metrics.tcToScCR)} icon="🔄" />
+        <StatCard label="Qualified" value={metrics.triageQualified} icon="⭐" />
+        <StatCard label="Sales Calls Booked" value={metrics.triageBookedSC} highlight icon="🎯" />
       </div>
 
-      {/* Recent Entries */}
+      {/* Individual Triager Performance */}
+      {(() => {
+        const currentTriagerIds = new Set(team.filter(m => m.role === 'triager').map(m => m.id));
+        const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'triager' || e.formType === 'triage').map(e => e.memberId));
+        const allIds = new Set([...currentTriagerIds, ...entryMemberIds]);
+        if (allIds.size === 0) return null;
+
+        const members = [...allIds].map(id => {
+          const m = team.find(t => t.id === id);
+          return m || { id, name: 'Former Member', role: 'triager', color: '#8A9DAB' };
+        });
+
+        return (
+          <>
+            <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Individual Triager</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+              {members.map(member => {
+                const memberEntries = filteredEntries.filter(e => e.memberId === member.id && (e.formType === 'triager' || e.formType === 'triage'));
+                const onCal = memberEntries.length;
+                const live = memberEntries.filter(e => e.showUp === 'live').length;
+                const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
+                const showRate = onCal > 0 ? (live / onCal * 100) : 0;
+                const qual = memberEntries.filter(e => e.showUp === 'live' && e.qualified === 'yes').length;
+                const bookedSC = memberEntries.filter(e => e.showUp === 'live' && e.bookedForSC === 'yes').length;
+                const isRemoved = !team.find(t => t.id === member.id);
+                return (
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
+                        <p className="text-xs text-brand-muted">{ROLE_LABELS['triager']} · {onCal} calls</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-5 gap-2">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Qualified</p><p className="text-lg font-bold text-brand-gold">{qual}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bookedSC}</p></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ===== 5. DM SETTING PERFORMANCE ===== */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">DM Setting Performance</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <StatCard label="Total Outbounds" value={fmt(metrics.totalOutbounds)} icon="📤" kpiColor={kc.outbounds} target={Math.round(kpi.totalOutbounds)} />
+        <StatCard label="Total Inbounds" value={fmt(metrics.totalInbounds)} icon="📥" />
+        <StatCard label="Reply Rate" value={fmtPct(metrics.replyRate)} icon="💬" kpiColor={kc.replyRate} target="30%" subtitle={`${fmt(metrics.totalReplies)} replies`} />
+        <StatCard label="Follow Ups (1st)" value={fmt(metrics.totalFollowUpsFirst)} icon="🔄" />
+        <StatCard label="Follow Ups (Convo)" value={fmt(metrics.totalFollowUpsInConvo)} icon="🔁" kpiColor={kc.followUpsConvo} target={Math.round(kpi.followUpsInConvo)} />
+        <StatCard label="Qualified Convos" value={fmt(metrics.totalQualified)} icon="✅" />
+        <StatCard label="Pitched Calls" value={fmt(metrics.totalPitched)} icon="📞" kpiColor={kc.pitched} target={Math.round(kpi.pitchedCalls)} />
+        <StatCard label="Links Sent" value={fmt(metrics.totalLinksSent)} icon="🔗" kpiColor={kc.links} target={Math.round(kpi.linksSent)} />
+        <StatCard label="Total Booked" value={fmt(metrics.totalBookedCalls)} icon="📅" kpiColor={kc.booked} target={Math.round(kpi.totalBooked)} subtitle={`${metrics.setterBookedTC} TC · ${metrics.setterBookedSC} SC`} />
+        <StatCard label="DM→Link CR" value={fmtPct(metrics.dmToLinkCR)} icon="📊" />
+        <StatCard label="Link→Booked CR" value={fmtPct(metrics.linkToBookedCR)} icon="📊" />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Pipeline Funnel */}
+        <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4">Pipeline Funnel</h3>
+          <div className="space-y-2">
+            {funnelData.map((item, i) => {
+              const maxVal = Math.max(...funnelData.map(d => d.value), 1);
+              const width = Math.max((item.value / maxVal) * 100, 2);
+              return (
+                <div key={item.name} className="flex items-center gap-3 animate-fade-in" style={{ animationDelay: `${i * 50}ms` }}>
+                  <span className="text-xs text-brand-muted w-20 text-right">{item.name}</span>
+                  <div className="flex-1 bg-brand-darker rounded-full h-7 overflow-hidden">
+                    <div
+                      className="h-full rounded-full flex items-center px-3 transition-all duration-700"
+                      style={{ width: `${width}%`, backgroundColor: item.fill }}
+                    >
+                      <span className="text-xs font-bold text-brand-darkest">{item.value}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Activity Over Time */}
+        <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-white mb-4">Outbound Activity Over Time</h3>
+          {dailyData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={dailyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#3A4D58" />
+                <XAxis dataKey="date" tick={{ fill: '#8A9DAB', fontSize: 11 }} />
+                <YAxis tick={{ fill: '#8A9DAB', fontSize: 11 }} />
+                <Tooltip content={<CustomTooltip />} />
+                <Line type="monotone" dataKey="outbounds" stroke={CHART_GOLD} strokeWidth={2} dot={{ fill: CHART_GOLD, r: 3 }} name="Outbounds" />
+                <Line type="monotone" dataKey="inbounds" stroke="#6EE1A8" strokeWidth={2} dot={{ fill: '#6EE1A8', r: 3 }} name="Inbounds" />
+                <Line type="monotone" dataKey="replies" stroke="#A86EE1" strokeWidth={2} dot={{ fill: '#A86EE1', r: 3 }} name="Replies" />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-[250px] flex items-center justify-center text-brand-muted text-sm">No activity data yet</div>
+          )}
+        </div>
+      </div>
+
+      {/* Individual DM Setter / Outbound Performance */}
+      {(() => {
+        const currentSetterIds = new Set(team.filter(m => m.role === 'setter' || m.role === 'outbound').map(m => m.id));
+        const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'setter' || e.formType === 'outbound').map(e => e.memberId));
+        const allIds = new Set([...currentSetterIds, ...entryMemberIds]);
+        if (allIds.size === 0) return null;
+
+        const members = [...allIds].map(id => {
+          const m = team.find(t => t.id === id);
+          return m || { id, name: 'Former Member', role: 'setter', color: '#8A9DAB' };
+        });
+
+        return (
+          <>
+            <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Individual DM Setter / Outbound</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+              {members.map(member => {
+                const memberEntries = filteredEntries.filter(e => e.memberId === member.id && (e.formType === 'setter' || e.formType === 'outbound'));
+                const out = memberEntries.reduce((s, e) => s + (parseInt(e.outbounds) || 0), 0);
+                const rep = memberEntries.reduce((s, e) => s + (parseInt(e.replies) || 0), 0);
+                const fu1 = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsFirst) || 0), 0);
+                const fuc = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsInConvo) || 0), 0);
+                const links = memberEntries.reduce((s, e) => s + (parseInt(e.bookingLinksSent) || 0), 0);
+                const btc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedTC) || 0), 0);
+                const bsc = memberEntries.reduce((s, e) => s + (parseInt(e.bookedSC) || 0), 0);
+                const daysWorked = memberEntries.length;
+                const isRemoved = !team.find(t => t.id === member.id);
+                return (
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
+                        <p className="text-xs text-brand-muted">{ROLE_LABELS[member.role]} · {daysWorked} days reported</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Outbounds</p><p className="text-lg font-bold text-white">{out}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Replies</p><p className="text-lg font-bold text-white">{rep}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Links Sent</p><p className="text-lg font-bold text-white">{links}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU (1st)</p><p className="text-lg font-bold text-white">{fu1}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC Booked</p><p className="text-lg font-bold text-brand-gold">{btc}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC Booked</p><p className="text-lg font-bold text-brand-gold">{bsc}</p></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ===== 6. RECENT ENTRIES ===== */}
       <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-white">Recent Entries</h3>
@@ -580,8 +605,12 @@ export default function Dashboard() {
                       <td className="py-3 px-3 text-brand-muted text-xs">
                         {entry.formType === 'setter' && `${entry.outbounds} out · ${entry.replies} rep · ${entry.bookedTC || 0} TC · ${entry.bookedSC || 0} SC`}
                         {entry.formType === 'outbound' && `${entry.outbounds} out · ${entry.followUpsFirst} FU`}
-                        {entry.formType === 'triage' && `${entry.showUp === 'live' ? '✅ Live' : '❌ No Show'} · ${entry.qualified === 'yes' ? 'Qualified' : 'Not Qual.'}`}
+                        {(entry.formType === 'triager' || entry.formType === 'triage') && `${entry.showUp === 'live' ? '✅ Live' : '❌ No Show'} · ${entry.qualified === 'yes' ? 'Qualified' : 'Not Qual.'}`}
                         {entry.formType === 'closer' && `${entry.showUp === 'noshow' ? '❌ No Show' : (entry.closed === 'yes' ? `✅ Closed ${fmtUSD(parseFloat(entry.totalDealSize))}` : '❌ No close')}`}
+                        {entry.formType === 'call_tracker' && (() => {
+                          const total = ['workshopOrganic','workshopAds','auditAds','linkInBio','youtube','email','linkedinOutbound','referral'].reduce((s, k) => s + (parseInt(entry[k]) || 0), 0);
+                          return `📞 ${total} calls booked`;
+                        })()}
                       </td>
                     </tr>
                   );

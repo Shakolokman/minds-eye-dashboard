@@ -16,6 +16,7 @@ const ROLE_LABELS = {
   setter: 'DM Setter',
   triager: 'Triager',
   outbound: 'Outbound VA',
+  call_tracker: 'Call Tracker',
 };
 
 const ROLE_COLORS = {
@@ -23,6 +24,7 @@ const ROLE_COLORS = {
   setter: 'bg-purple-600',
   triager: 'bg-rose-600',
   outbound: 'bg-blue-600',
+  call_tracker: 'bg-teal-600',
 };
 
 // KPI Targets (weekly)
@@ -453,6 +455,7 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const outboundEntries = entries.filter(e => e.formType === 'outbound');
   const triageEntries = entries.filter(e => e.formType === 'triage' || e.formType === 'triager');
   const closerEntries = entries.filter(e => e.formType === 'closer');
+  const callTrackerEntries = entries.filter(e => e.formType === 'call_tracker');
 
   const totalOutbounds = [...setterEntries, ...outboundEntries].reduce((s, e) => s + (parseInt(e.outbounds) || 0), 0);
   const totalInbounds = setterEntries.reduce((s, e) => s + (parseInt(e.inbounds) || 0), 0);
@@ -530,6 +533,20 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const allHeld = triageLiveCalls + closerLiveCalls;
   const allShowUpRate = allOnCalendar > 0 ? (allHeld / allOnCalendar * 100) : 0;
 
+  // Call tracker sources (from Chris's daily reports)
+  const CALL_SOURCES = ['workshopOrganic', 'workshopAds', 'auditAds', 'linkInBio', 'youtube', 'email', 'linkedinOutbound', 'referral'];
+  const callsBySource = {};
+  CALL_SOURCES.forEach(src => {
+    callsBySource[src] = callTrackerEntries.reduce((s, e) => s + (parseInt(e[src]) || 0), 0);
+  });
+  const trackerTotalCalls = Object.values(callsBySource).reduce((s, v) => s + v, 0);
+
+  // DM setter booked calls (inbound IG + outbound IG)
+  const setterInboundIG = setterEntries.reduce((s, e) => s + (parseInt(e.bookedTC) || 0) + (parseInt(e.bookedSC) || 0), 0);
+
+  // All calls booked (call tracker sources + setter booked calls)
+  const allCallsBooked = trackerTotalCalls + totalBookedCalls;
+
   return {
     totalOutbounds, totalInbounds, totalReplies, totalFollowUpsFirst, totalFollowUpsInConvo,
     totalQualified, totalPitched, totalLinksSent, totalBookedCalls, setterBookedTC, setterBookedSC, totalConversations,
@@ -540,6 +557,7 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
     avgCashPerClose, avgRevPerClose, cashToRevPercent,
     pifDeals, splitDeals, depositDeals,
     dmToLinkCR, linkToBookedCR, tcToScCR,
+    callsBySource, trackerTotalCalls, allCallsBooked,
   };
 }
 

@@ -64,6 +64,9 @@ export default function SubmitPage() {
     // Closer
     closed: '', totalDealSize: '', cashCollected: '', paymentMethod: '', paymentType: '', paymentDetails: '',
     discoveryRating: 0, pitchRating: 0, objectionRating: 0, performanceNotes: '',
+    // Call Tracker
+    workshopOrganic: '', workshopAds: '', auditAds: '', linkInBio: '',
+    youtube: '', email: '', linkedinOutbound: '', referral: '',
   });
 
   useEffect(() => { async function load() { setTeam(await getTeam()); setMounted(true); } load(); }, []);
@@ -102,6 +105,8 @@ export default function SubmitPage() {
         leadQuality: 0, callRecording: '', ghlUpdated: false,
         closed: '', totalDealSize: '', cashCollected: '', paymentMethod: '', paymentType: '', paymentDetails: '',
         discoveryRating: 0, pitchRating: 0, objectionRating: 0, performanceNotes: '',
+        workshopOrganic: '', workshopAds: '', auditAds: '', linkInBio: '',
+        youtube: '', email: '', linkedinOutbound: '', referral: '',
       }));
       if (role === 'setter' || role === 'outbound') setSelectedMember('');
     }, 2000);
@@ -346,6 +351,48 @@ export default function SubmitPage() {
                     <Field label="Call Recording Link"><input className="input-field" value={form.callRecording} onChange={e => updateForm('callRecording', e.target.value)} placeholder="https://..." /></Field>
                   </>
                 )}
+              </>
+            )}
+
+            {/* ===== CALL TRACKER FORM ===== */}
+            {role === 'call_tracker' && (
+              <>
+                <Field label="Date" required>
+                  <input type="date" className="input-field" value={form.date} onChange={e => updateForm('date', e.target.value)} required />
+                </Field>
+                <div className="bg-brand-darker border border-brand-slate/30 rounded-xl p-4 mb-2">
+                  <p className="text-sm font-semibold text-white mb-3">📞 Calls Booked by Source</p>
+                  <p className="text-xs text-brand-muted mb-4">Enter the number of calls booked today from each source. Leave at 0 if none.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Workshop (Organic)">
+                      <input type="number" min="0" className="input-field" value={form.workshopOrganic} onChange={e => updateForm('workshopOrganic', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="Workshop (Ads)">
+                      <input type="number" min="0" className="input-field" value={form.workshopAds} onChange={e => updateForm('workshopAds', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="Audit Ads">
+                      <input type="number" min="0" className="input-field" value={form.auditAds} onChange={e => updateForm('auditAds', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="Link in Bio">
+                      <input type="number" min="0" className="input-field" value={form.linkInBio} onChange={e => updateForm('linkInBio', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="YouTube">
+                      <input type="number" min="0" className="input-field" value={form.youtube} onChange={e => updateForm('youtube', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="Email">
+                      <input type="number" min="0" className="input-field" value={form.email} onChange={e => updateForm('email', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="LinkedIn Outbound">
+                      <input type="number" min="0" className="input-field" value={form.linkedinOutbound} onChange={e => updateForm('linkedinOutbound', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="Referral">
+                      <input type="number" min="0" className="input-field" value={form.referral} onChange={e => updateForm('referral', e.target.value)} placeholder="0" />
+                    </Field>
+                  </div>
+                </div>
+                <Field label="Notes (optional)">
+                  <textarea className="input-field min-h-[60px]" value={form.notes} onChange={e => updateForm('notes', e.target.value)} placeholder="Anything notable about today's bookings?" />
+                </Field>
               </>
             )}
 
