@@ -109,7 +109,7 @@ export default function Dashboard() {
     replyRate: getKpiColor(metrics.replyRate, kpi.replyRate),
     showUp: getKpiColor(metrics.triageShowUpRate, kpi.showUpRate),
     closeRate: getKpiColor(metrics.closeRate, kpi.closeRate),
-    revenue: getKpiColor(metrics.totalRevenue, kpi.revenue),
+    revenue: getKpiColor(metrics.totalRevenueWithLT, kpi.revenue),
   };
 
   // Funnel data
@@ -273,7 +273,7 @@ export default function Dashboard() {
       {/* ===== 1. REVENUE & PAYMENTS (moved to top) ===== */}
       <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Revenue & Payments</h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-8">
-        <StatCard label="Total Revenue" value={fmtUSD(metrics.totalRevenue)} icon="💰" kpiColor={kc.revenue} target={fmtUSD(Math.round(kpi.revenue))} />
+        <StatCard label="Total Revenue" value={fmtUSD(metrics.totalRevenueWithLT)} icon="💰" kpiColor={kc.revenue} target={fmtUSD(Math.round(kpi.revenue))} />
         <StatCard label="Cash Collected" value={fmtUSD(metrics.allCashTotal)} icon="💵" subtitle={metrics.stripeCashTotal > 0 ? `💳${fmtUSD(metrics.stripeCashTotal)} Stripe · 🏦${fmtUSD(metrics.totalCashWithWire)} close+wire` : undefined} />
         <StatCard label="AVG Cash/Close" value={fmtUSD(metrics.avgCashPerClose)} icon="📊" />
         <StatCard label="AVG Rev/Close" value={fmtUSD(metrics.avgRevPerClose)} icon="📊" />

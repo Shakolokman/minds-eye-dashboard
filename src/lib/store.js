@@ -510,15 +510,20 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
     return s + Math.max(0, cash);
   }, 0);
   const wireCash = wireTransfers.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
-  // Stripe cash from auto-imported payments (>= $100 to exclude low-ticket workshops)
+  // Stripe cash — ALL successful payments (including low-ticket workshops)
   const stripeCashTotal = stripePayments
-    .filter(p => p.status === 'succeeded' && (parseFloat(p.amount) || 0) >= 100)
+    .filter(p => p.status === 'succeeded')
     .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  // Low-ticket Stripe revenue (workshops < $100) — adds to total revenue
+  const lowTicketRevenue = stripePayments
+    .filter(p => p.status === 'succeeded' && (parseFloat(p.amount) || 0) < 100)
+    .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+  const totalRevenueWithLT = totalRevenue + lowTicketRevenue;
   const totalCashWithWire = totalCashCollected + wireCash;
   const allCashTotal = totalCashWithWire + stripeCashTotal;
   const avgCashPerClose = totalClosed > 0 ? allCashTotal / totalClosed : 0;
-  const avgRevPerClose = totalClosed > 0 ? totalRevenue / totalClosed : 0;
-  const cashToRevPercent = totalRevenue > 0 ? (allCashTotal / totalRevenue * 100) : 0;
+  const avgRevPerClose = totalClosed > 0 ? totalRevenueWithLT / totalClosed : 0;
+  const cashToRevPercent = totalRevenueWithLT > 0 ? (allCashTotal / totalRevenueWithLT * 100) : 0;
 
   const pifDeals = closedDeals.filter(e => e.paymentType === 'pif' || (e.paymentDetails || '').toLowerCase().includes('pif')).length;
   const splitDeals = closedDeals.filter(e => e.paymentType === 'split' || (e.paymentDetails || '').toLowerCase().includes('split')).length;
@@ -553,7 +558,7 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
     replyRate, allShowUpRate,
     triageOnCalendar, triageLiveCalls, triageNoShows, triageShowUpRate, triageQualified, triageBookedSC,
     closerOnCalendar, closerLiveCalls, closerNoShows, closerShowUpRate,
-    totalClosed, closeRate, totalRevenue, totalCashCollected, wireCash, stripeCashTotal, totalCashWithWire, allCashTotal,
+    totalClosed, closeRate, totalRevenue, totalRevenueWithLT, lowTicketRevenue, totalCashCollected, wireCash, stripeCashTotal, totalCashWithWire, allCashTotal,
     avgCashPerClose, avgRevPerClose, cashToRevPercent,
     pifDeals, splitDeals, depositDeals,
     dmToLinkCR, linkToBookedCR, tcToScCR,
