@@ -367,29 +367,59 @@ export default function Dashboard() {
 
       {/* ===== 3. ALL CALLS BOOKED (NEW) ===== */}
       <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">All Calls Booked</h2>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatCard label="Total Calls Booked" value={metrics.allCallsBooked} highlight icon="📞" />
         <StatCard label="From DM Setting" value={metrics.totalBookedCalls} icon="💬" subtitle={`${metrics.setterBookedTC} TC · ${metrics.setterBookedSC} SC`} />
+        <StatCard label="From Phone Setter" value={metrics.phoneTotalBooked} icon="📱" subtitle={`${metrics.phoneTCWorkshop + metrics.phoneTCPipeline} TC · ${metrics.phoneSCWorkshop + metrics.phoneSCGeneral} SC`} />
         <StatCard label="From Other Sources" value={metrics.trackerTotalCalls} icon="📊" />
       </div>
-      {metrics.trackerTotalCalls > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-          {[
-            { key: 'workshopOrganic', label: 'Workshop (Organic)', icon: '🎓' },
-            { key: 'workshopAds', label: 'Workshop (Ads)', icon: '📢' },
-            { key: 'auditAds', label: 'Audit Ads', icon: '🔍' },
-            { key: 'linkInBio', label: 'Link in Bio', icon: '🔗' },
-            { key: 'youtube', label: 'YouTube', icon: '▶️' },
-            { key: 'email', label: 'Email', icon: '📧' },
-            { key: 'linkedinOutbound', label: 'LinkedIn Outbound', icon: '💼' },
-            { key: 'referral', label: 'Referral', icon: '🤝' },
-          ].filter(s => (metrics.callsBySource[s.key] || 0) > 0).map(s => (
-            <div key={s.key} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-4 text-center">
-              <p className="text-xs text-brand-muted font-semibold mb-1">{s.icon} {s.label}</p>
-              <p className="text-2xl font-bold text-white">{metrics.callsBySource[s.key]}</p>
+
+      {/* Calls Booked from Phone Setter — detail breakdown */}
+      {metrics.phoneTotalBooked > 0 && (
+        <>
+          <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Calls Booked from Phone Setter</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-4 text-center">
+              <p className="text-xs text-brand-muted font-semibold mb-1">🎓 TC (Workshop)</p>
+              <p className="text-2xl font-bold text-white">{metrics.phoneTCWorkshop}</p>
             </div>
-          ))}
-        </div>
+            <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-4 text-center">
+              <p className="text-xs text-brand-muted font-semibold mb-1">📥 TC (Pipeline)</p>
+              <p className="text-2xl font-bold text-white">{metrics.phoneTCPipeline}</p>
+            </div>
+            <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-4 text-center">
+              <p className="text-xs text-brand-muted font-semibold mb-1">🎓 SC (Workshop)</p>
+              <p className="text-2xl font-bold text-white">{metrics.phoneSCWorkshop}</p>
+            </div>
+            <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-4 text-center">
+              <p className="text-xs text-brand-muted font-semibold mb-1">💰 SC (Other)</p>
+              <p className="text-2xl font-bold text-white">{metrics.phoneSCGeneral}</p>
+            </div>
+          </div>
+        </>
+      )}
+
+      {metrics.trackerTotalCalls > 0 && (
+        <>
+          <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Calls Booked from Other Sources</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+            {[
+              { key: 'workshopOrganic', label: 'Workshop (Organic)', icon: '🎓' },
+              { key: 'workshopAds', label: 'Workshop (Ads)', icon: '📢' },
+              { key: 'auditAds', label: 'Audit Ads', icon: '🔍' },
+              { key: 'linkInBio', label: 'Link in Bio', icon: '🔗' },
+              { key: 'youtube', label: 'YouTube', icon: '▶️' },
+              { key: 'email', label: 'Email', icon: '📧' },
+              { key: 'linkedinOutbound', label: 'LinkedIn Outbound', icon: '💼' },
+              { key: 'referral', label: 'Referral', icon: '🤝' },
+            ].filter(s => (metrics.callsBySource[s.key] || 0) > 0).map(s => (
+              <div key={s.key} className="bg-brand-surface border border-brand-slate/30 rounded-xl p-4 text-center">
+                <p className="text-xs text-brand-muted font-semibold mb-1">{s.icon} {s.label}</p>
+                <p className="text-2xl font-bold text-white">{metrics.callsBySource[s.key]}</p>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* ===== 4. TRIAGE PERFORMANCE ===== */}
@@ -453,7 +483,100 @@ export default function Dashboard() {
         );
       })()}
 
-      {/* ===== 5. DM SETTING PERFORMANCE ===== */}
+      {/* ===== 5. PHONE SETTING PERFORMANCE ===== */}
+      <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">Phone Setting Performance</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+        <StatCard label="Total Dials" value={fmt(metrics.phoneDials)} icon="📞" />
+        <StatCard label="No Answers" value={fmt(metrics.phoneNoAnswers)} icon="📵" />
+        <StatCard label="Qualified Convos" value={fmt(metrics.phoneQualified)} icon="✅" />
+        <StatCard label="Unqualified Leads" value={fmt(metrics.phoneUnqualified)} icon="❌" />
+        <StatCard label="Connect Rate" value={fmtPct(metrics.phoneConnectRate)} icon="🔗" subtitle="talks / dials" />
+        <StatCard label="Qualification Rate" value={fmtPct(metrics.phoneQualificationRate)} icon="🎯" subtitle="qualified / talks" />
+        <StatCard label="Total Calls Booked" value={fmt(metrics.phoneTotalBooked)} highlight icon="📅" subtitle={`${metrics.phoneTCWorkshop + metrics.phoneTCPipeline} TC · ${metrics.phoneSCWorkshop + metrics.phoneSCGeneral} SC`} />
+        <StatCard label="Booking Rate" value={fmtPct(metrics.phoneBookingRate)} icon="📊" subtitle="booked / qualified" />
+        <StatCard label="Follow-Ups Called" value={fmt(metrics.phoneFollowUpsCalled)} icon="🔁" />
+        <StatCard label="Follow-Up Conversion" value={fmtPct(metrics.phoneFollowUpConversion)} icon="🔄" subtitle={`${metrics.phoneFollowUpBookings} from ${metrics.phoneFollowUpsCalled} FUs`} />
+        <StatCard label="Not Interested" value={fmt(metrics.phoneNotInterested)} icon="🚫" />
+        <StatCard label="Call-Back Requests" value={fmt(metrics.phoneCallBackRequests)} icon="📲" />
+      </div>
+
+      {/* Individual Phone Setter Performance */}
+      {(() => {
+        const currentPhoneSetterIds = new Set(team.filter(m => m.role === 'phone_setter').map(m => m.id));
+        const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'phone_setter').map(e => e.memberId));
+        const allIds = new Set([...currentPhoneSetterIds, ...entryMemberIds]);
+        if (allIds.size === 0) return null;
+
+        const members = [...allIds].map(id => {
+          const m = team.find(t => t.id === id);
+          return m || { id, name: 'Former Member', role: 'phone_setter', color: '#8A9DAB' };
+        });
+
+        return (
+          <>
+            <h3 className="text-xs font-semibold text-brand-muted uppercase tracking-wider mb-3 mt-2">Individual Phone Setter</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+              {members.map(member => {
+                const memberEntries = filteredEntries.filter(e => e.memberId === member.id && e.formType === 'phone_setter');
+                const dials = memberEntries.reduce((s, e) => s + (parseInt(e.dials) || 0), 0);
+                const noAns = memberEntries.reduce((s, e) => s + (parseInt(e.noAnswers) || 0), 0);
+                const qual = memberEntries.reduce((s, e) => s + (parseInt(e.qualifiedConvos) || 0), 0);
+                const unqual = memberEntries.reduce((s, e) => s + (parseInt(e.unqualifiedLeads) || 0), 0);
+                const tcW = memberEntries.reduce((s, e) => s + (parseInt(e.tcBookedWorkshop) || 0), 0);
+                const tcP = memberEntries.reduce((s, e) => s + (parseInt(e.tcBookedPipeline) || 0), 0);
+                const scW = memberEntries.reduce((s, e) => s + (parseInt(e.scBookedWorkshop) || 0), 0);
+                const scO = memberEntries.reduce((s, e) => s + (parseInt(e.scBooked) || 0), 0);
+                const totalBooked = tcW + tcP + scW + scO;
+                const fuCalled = memberEntries.reduce((s, e) => s + (parseInt(e.followUpsCalled) || 0), 0);
+                const tcFU = memberEntries.reduce((s, e) => s + (parseInt(e.tcFromFollowUps) || 0), 0);
+                const scFU = memberEntries.reduce((s, e) => s + (parseInt(e.scFromFollowUps) || 0), 0);
+                const fuBookings = tcFU + scFU;
+                const convos = qual + unqual;
+                const connectRate = dials > 0 ? (convos / dials * 100) : 0;
+                const bookingRate = qual > 0 ? (totalBooked / qual * 100) : 0;
+                const fuConversion = fuCalled > 0 ? (fuBookings / fuCalled * 100) : 0;
+                const daysWorked = memberEntries.length;
+                const isRemoved = !team.find(t => t.id === member.id);
+                return (
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
+                      <div>
+                        <p className="text-sm font-bold text-white">{member.name}{isRemoved ? ' (removed)' : ''}</p>
+                        <p className="text-xs text-brand-muted">{ROLE_LABELS['phone_setter']} · {daysWorked} days reported</p>
+                      </div>
+                      <div className="ml-auto text-right">
+                        <p className="text-lg font-bold text-brand-gold">{totalBooked}</p>
+                        <p className="text-xs text-brand-muted">calls booked</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Dials</p><p className="text-lg font-bold text-white">{dials}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">No Ans</p><p className="text-lg font-bold text-red-400">{noAns}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Qual</p><p className="text-lg font-bold text-white">{qual}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Connect %</p><p className="text-lg font-bold text-white">{fmtPct(connectRate)}</p></div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2 mb-3">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC (Wksp)</p><p className="text-lg font-bold text-brand-gold">{tcW}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC (Pipe)</p><p className="text-lg font-bold text-brand-gold">{tcP}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC (Wksp)</p><p className="text-lg font-bold text-brand-gold">{scW}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC (Other)</p><p className="text-lg font-bold text-brand-gold">{scO}</p></div>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Book %</p><p className="text-lg font-bold text-white">{fmtPct(bookingRate)}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FUs</p><p className="text-lg font-bold text-white">{fuCalled}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU Bkd</p><p className="text-lg font-bold text-brand-gold">{fuBookings}</p></div>
+                      <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU CR</p><p className="text-lg font-bold text-white">{fmtPct(fuConversion)}</p></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        );
+      })()}
+
+      {/* ===== 6. DM SETTING PERFORMANCE ===== */}
       <h2 className="text-sm font-semibold text-brand-muted uppercase tracking-wider mb-3">DM Setting Performance</h2>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
         <StatCard label="Total Outbounds" value={fmt(metrics.totalOutbounds)} icon="📤" kpiColor={kc.outbounds} target={Math.round(kpi.totalOutbounds)} />
@@ -610,6 +733,11 @@ export default function Dashboard() {
                         {entry.formType === 'call_tracker' && (() => {
                           const total = ['workshopOrganic','workshopAds','auditAds','linkInBio','youtube','email','linkedinOutbound','referral'].reduce((s, k) => s + (parseInt(entry[k]) || 0), 0);
                           return `📞 ${total} calls booked`;
+                        })()}
+                        {entry.formType === 'phone_setter' && (() => {
+                          const dials = parseInt(entry.dials) || 0;
+                          const booked = (parseInt(entry.tcBookedWorkshop)||0) + (parseInt(entry.tcBookedPipeline)||0) + (parseInt(entry.scBookedWorkshop)||0) + (parseInt(entry.scBooked)||0);
+                          return `${dials} dials · ${booked} booked`;
                         })()}
                       </td>
                     </tr>

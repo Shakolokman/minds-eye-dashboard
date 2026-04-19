@@ -109,6 +109,57 @@ function ReportModal({ entry, member, onClose }) {
               )}
             </>
           )}
+          {entry.formType === 'call_tracker' && (
+            <>
+              <Divider />
+              <div className="grid grid-cols-2 gap-3">
+                <MetricBox label="Workshop (Organic)" value={entry.workshopOrganic} gold={parseInt(entry.workshopOrganic) > 0} />
+                <MetricBox label="Workshop (Ads)" value={entry.workshopAds} gold={parseInt(entry.workshopAds) > 0} />
+                <MetricBox label="Audit Ads" value={entry.auditAds} gold={parseInt(entry.auditAds) > 0} />
+                <MetricBox label="Link in Bio" value={entry.linkInBio} gold={parseInt(entry.linkInBio) > 0} />
+                <MetricBox label="YouTube" value={entry.youtube} gold={parseInt(entry.youtube) > 0} />
+                <MetricBox label="Email" value={entry.email} gold={parseInt(entry.email) > 0} />
+                <MetricBox label="LinkedIn Outbound" value={entry.linkedinOutbound} gold={parseInt(entry.linkedinOutbound) > 0} />
+                <MetricBox label="Referral" value={entry.referral} gold={parseInt(entry.referral) > 0} />
+              </div>
+              {entry.notes && <><Divider /><Row label="Notes" value={entry.notes} long /></>}
+            </>
+          )}
+          {entry.formType === 'phone_setter' && (
+            <>
+              {entry.winOfDay && <Row label="Win of the Day 🏆" value={entry.winOfDay} />}
+              {entry.hoursWorked && <Row label="Hours Worked" value={entry.hoursWorked} />}
+              <Divider />
+              <p className="text-xs font-semibold text-brand-muted uppercase tracking-wider">📞 Call Activity</p>
+              <div className="grid grid-cols-2 gap-3">
+                <MetricBox label="Dials" value={entry.dials} />
+                <MetricBox label="No Answers" value={entry.noAnswers} />
+                <MetricBox label="Qualified Convos" value={entry.qualifiedConvos} />
+                <MetricBox label="Unqualified Leads" value={entry.unqualifiedLeads} />
+              </div>
+              <Divider />
+              <p className="text-xs font-semibold text-brand-muted uppercase tracking-wider">📅 Calls Booked</p>
+              <div className="grid grid-cols-2 gap-3">
+                <MetricBox label="TC (Workshop)" value={entry.tcBookedWorkshop} gold={parseInt(entry.tcBookedWorkshop) > 0} />
+                <MetricBox label="TC (Pipeline)" value={entry.tcBookedPipeline} gold={parseInt(entry.tcBookedPipeline) > 0} />
+                <MetricBox label="SC (Workshop)" value={entry.scBookedWorkshop} gold={parseInt(entry.scBookedWorkshop) > 0} />
+                <MetricBox label="SC (Other)" value={entry.scBooked} gold={parseInt(entry.scBooked) > 0} />
+              </div>
+              <Divider />
+              <p className="text-xs font-semibold text-brand-muted uppercase tracking-wider">🔁 Follow-Ups</p>
+              <div className="grid grid-cols-3 gap-3">
+                <MetricBox label="FU Called" value={entry.followUpsCalled} />
+                <MetricBox label="TC from FU" value={entry.tcFromFollowUps} gold={parseInt(entry.tcFromFollowUps) > 0} />
+                <MetricBox label="SC from FU" value={entry.scFromFollowUps} gold={parseInt(entry.scFromFollowUps) > 0} />
+              </div>
+              <Divider />
+              <div className="grid grid-cols-2 gap-3">
+                <MetricBox label="Not Interested" value={entry.notInterested} />
+                <MetricBox label="Call-Back Requests" value={entry.callBackRequests} />
+              </div>
+              {entry.notes && <><Divider /><Row label="Notes" value={entry.notes} long /></>}
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -197,6 +248,8 @@ export default function EntriesPage() {
           <option value="outbound">Outbound VA</option>
           <option value="triager">Triager</option>
           <option value="closer">Closer</option>
+          <option value="phone_setter">Phone Setter</option>
+          <option value="call_tracker">Call Tracker</option>
         </select>
         <select value={filterMember} onChange={e => setFilterMember(e.target.value)} className="bg-brand-darker border border-brand-slate/50 rounded-lg px-3 py-1.5 text-xs text-white">
           <option value="all">All Members</option>
@@ -252,10 +305,21 @@ export default function EntriesPage() {
                         )}
                         {entry.formType === 'triager' && <span className="text-brand-muted">{entry.leadName || '—'}</span>}
                         {entry.formType === 'closer' && <span className="text-brand-muted">{entry.leadName || '—'}</span>}
+                        {entry.formType === 'phone_setter' && (() => {
+                          const dials = parseInt(entry.dials) || 0;
+                          const booked = (parseInt(entry.tcBookedWorkshop)||0) + (parseInt(entry.tcBookedPipeline)||0) + (parseInt(entry.scBookedWorkshop)||0) + (parseInt(entry.scBooked)||0);
+                          return <span className="text-brand-muted"><span className="text-white font-semibold">{dials}</span> dials · <span className="text-brand-gold font-semibold">{booked}</span> bkd</span>;
+                        })()}
+                        {entry.formType === 'call_tracker' && (() => {
+                          const total = ['workshopOrganic','workshopAds','auditAds','linkInBio','youtube','email','linkedinOutbound','referral'].reduce((s, k) => s + (parseInt(entry[k]) || 0), 0);
+                          return <span className="text-brand-muted">📞 <span className="text-brand-gold font-semibold">{total}</span> calls booked</span>;
+                        })()}
                       </td>
                       <td className="py-3 px-4 text-xs">
                         {entry.formType === 'setter' && <span className="text-green-400">✅ Submitted</span>}
                         {entry.formType === 'outbound' && <span className="text-green-400">✅ Submitted</span>}
+                        {entry.formType === 'phone_setter' && <span className="text-green-400">✅ Submitted</span>}
+                        {entry.formType === 'call_tracker' && <span className="text-green-400">✅ Submitted</span>}
                         {entry.formType === 'triager' && (
                           entry.showUp === 'live'
                             ? (entry.bookedForSC === 'yes' ? <span className="text-green-400">✅ Booked SC</span> : <span className="text-brand-muted">Live — not booked</span>)

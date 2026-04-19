@@ -17,6 +17,7 @@ const ROLE_LABELS = {
   triager: 'Triager',
   outbound: 'Outbound VA',
   call_tracker: 'Call Tracker',
+  phone_setter: 'Phone Setter',
 };
 
 const ROLE_COLORS = {
@@ -25,6 +26,7 @@ const ROLE_COLORS = {
   triager: 'bg-rose-600',
   outbound: 'bg-blue-600',
   call_tracker: 'bg-teal-600',
+  phone_setter: 'bg-cyan-600',
 };
 
 // KPI Targets (weekly)
@@ -456,6 +458,7 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const triageEntries = entries.filter(e => e.formType === 'triage' || e.formType === 'triager');
   const closerEntries = entries.filter(e => e.formType === 'closer');
   const callTrackerEntries = entries.filter(e => e.formType === 'call_tracker');
+  const phoneSetterEntries = entries.filter(e => e.formType === 'phone_setter');
 
   const totalOutbounds = [...setterEntries, ...outboundEntries].reduce((s, e) => s + (parseInt(e.outbounds) || 0), 0);
   const totalInbounds = setterEntries.reduce((s, e) => s + (parseInt(e.inbounds) || 0), 0);
@@ -549,8 +552,31 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   // DM setter booked calls (inbound IG + outbound IG)
   const setterInboundIG = setterEntries.reduce((s, e) => s + (parseInt(e.bookedTC) || 0) + (parseInt(e.bookedSC) || 0), 0);
 
-  // All calls booked (call tracker sources + setter booked calls)
-  const allCallsBooked = trackerTotalCalls + totalBookedCalls;
+  // ===== PHONE SETTER METRICS =====
+  const phoneDials = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.dials) || 0), 0);
+  const phoneNoAnswers = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.noAnswers) || 0), 0);
+  const phoneQualified = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.qualifiedConvos) || 0), 0);
+  const phoneUnqualified = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.unqualifiedLeads) || 0), 0);
+  const phoneTCWorkshop = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.tcBookedWorkshop) || 0), 0);
+  const phoneTCPipeline = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.tcBookedPipeline) || 0), 0);
+  const phoneSCWorkshop = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.scBookedWorkshop) || 0), 0);
+  const phoneSCGeneral = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.scBooked) || 0), 0);
+  const phoneFollowUpsCalled = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.followUpsCalled) || 0), 0);
+  const phoneTCFromFollowUps = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.tcFromFollowUps) || 0), 0);
+  const phoneSCFromFollowUps = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.scFromFollowUps) || 0), 0);
+  const phoneNotInterested = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.notInterested) || 0), 0);
+  const phoneCallBackRequests = phoneSetterEntries.reduce((s, e) => s + (parseInt(e.callBackRequests) || 0), 0);
+
+  const phoneTotalBooked = phoneTCWorkshop + phoneTCPipeline + phoneSCWorkshop + phoneSCGeneral;
+  const phoneTotalConversations = phoneQualified + phoneUnqualified;
+  const phoneConnectRate = phoneDials > 0 ? (phoneTotalConversations / phoneDials * 100) : 0;
+  const phoneQualificationRate = phoneTotalConversations > 0 ? (phoneQualified / phoneTotalConversations * 100) : 0;
+  const phoneBookingRate = phoneQualified > 0 ? (phoneTotalBooked / phoneQualified * 100) : 0;
+  const phoneFollowUpBookings = phoneTCFromFollowUps + phoneSCFromFollowUps;
+  const phoneFollowUpConversion = phoneFollowUpsCalled > 0 ? (phoneFollowUpBookings / phoneFollowUpsCalled * 100) : 0;
+
+  // All calls booked (call tracker sources + setter booked calls + phone setter bookings)
+  const allCallsBooked = trackerTotalCalls + totalBookedCalls + phoneTotalBooked;
 
   return {
     totalOutbounds, totalInbounds, totalReplies, totalFollowUpsFirst, totalFollowUpsInConvo,
@@ -563,6 +589,13 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
     pifDeals, splitDeals, depositDeals,
     dmToLinkCR, linkToBookedCR, tcToScCR,
     callsBySource, trackerTotalCalls, allCallsBooked,
+    // Phone Setter
+    phoneDials, phoneNoAnswers, phoneQualified, phoneUnqualified,
+    phoneTCWorkshop, phoneTCPipeline, phoneSCWorkshop, phoneSCGeneral,
+    phoneFollowUpsCalled, phoneTCFromFollowUps, phoneSCFromFollowUps,
+    phoneNotInterested, phoneCallBackRequests,
+    phoneTotalBooked, phoneTotalConversations, phoneFollowUpBookings,
+    phoneConnectRate, phoneQualificationRate, phoneBookingRate, phoneFollowUpConversion,
   };
 }
 

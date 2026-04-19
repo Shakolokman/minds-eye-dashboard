@@ -67,6 +67,11 @@ export default function SubmitPage() {
     // Call Tracker
     workshopOrganic: '', workshopAds: '', auditAds: '', linkInBio: '',
     youtube: '', email: '', linkedinOutbound: '', referral: '',
+    // Phone Setter
+    dials: '', noAnswers: '', unqualifiedLeads: '',
+    tcBookedWorkshop: '', tcBookedPipeline: '', scBooked: '', scBookedWorkshop: '',
+    followUpsCalled: '', tcFromFollowUps: '', scFromFollowUps: '',
+    notInterested: '', callBackRequests: '',
   });
 
   useEffect(() => { async function load() { setTeam(await getTeam()); setMounted(true); } load(); }, []);
@@ -107,8 +112,12 @@ export default function SubmitPage() {
         discoveryRating: 0, pitchRating: 0, objectionRating: 0, performanceNotes: '',
         workshopOrganic: '', workshopAds: '', auditAds: '', linkInBio: '',
         youtube: '', email: '', linkedinOutbound: '', referral: '',
+        dials: '', noAnswers: '', unqualifiedLeads: '',
+        tcBookedWorkshop: '', tcBookedPipeline: '', scBooked: '', scBookedWorkshop: '',
+        followUpsCalled: '', tcFromFollowUps: '', scFromFollowUps: '',
+        notInterested: '', callBackRequests: '',
       }));
-      if (role === 'setter' || role === 'outbound') setSelectedMember('');
+      if (role === 'setter' || role === 'outbound' || role === 'phone_setter') setSelectedMember('');
     }, 2000);
   };
 
@@ -122,7 +131,7 @@ export default function SubmitPage() {
             <svg className="w-8 h-8 text-brand-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
           </div>
           <h2 className="text-xl font-display font-bold text-white mb-1">Report Submitted!</h2>
-          <p className="text-brand-muted text-sm">{role === 'setter' || role === 'outbound' ? 'Redirecting...' : 'Submit another call report or go back.'}</p>
+          <p className="text-brand-muted text-sm">{role === 'setter' || role === 'outbound' || role === 'phone_setter' ? 'Redirecting...' : 'Submit another call report or go back.'}</p>
         </div>
       </div>
     );
@@ -167,6 +176,8 @@ export default function SubmitPage() {
                   {r === 'closer' && '💰 Sales Call'}
                   {r === 'setter' && '📤 DM Setting'}
                   {r === 'outbound' && '📤 Outbound'}
+                  {r === 'phone_setter' && '📞 Phone Setting'}
+                  {r === 'call_tracker' && '📊 Call Tracker'}
                 </button>
               ))}
             </div>
@@ -183,9 +194,11 @@ export default function SubmitPage() {
               {role === 'outbound' && 'Outbound Report'}
               {role === 'triager' && 'Triage Call Report'}
               {role === 'closer' && 'Sales Call Report'}
+              {role === 'phone_setter' && 'Phone Setter EOD Report'}
+              {role === 'call_tracker' && 'Call Tracker Report'}
             </h2>
             <p className="text-xs text-brand-muted mb-5">
-              {(role === 'setter' || role === 'outbound') ? 'One report per day' : 'One report per call'}
+              {(role === 'setter' || role === 'outbound' || role === 'phone_setter' || role === 'call_tracker') ? 'One report per day' : 'One report per call'}
             </p>
 
             {/* Date */}
@@ -392,6 +405,94 @@ export default function SubmitPage() {
                 </div>
                 <Field label="Notes (optional)">
                   <textarea className="input-field min-h-[60px]" value={form.notes} onChange={e => updateForm('notes', e.target.value)} placeholder="Anything notable about today's bookings?" />
+                </Field>
+              </>
+            )}
+
+            {/* ========== PHONE SETTER FORM ========== */}
+            {role === 'phone_setter' && (
+              <>
+                <Field label="Win of the Day 🏆">
+                  <input className="input-field" value={form.winOfDay} onChange={e => updateForm('winOfDay', e.target.value)} placeholder="Biggest win today?" />
+                </Field>
+                <Field label="Hours Worked">
+                  <input className="input-field" value={form.hoursWorked} onChange={e => updateForm('hoursWorked', e.target.value)} placeholder="e.g. 9am - 5pm" />
+                </Field>
+
+                {/* Call Activity */}
+                <div className="bg-brand-darker border border-brand-slate/30 rounded-xl p-4 mb-2 mt-2">
+                  <p className="text-sm font-semibold text-white mb-1">📞 Call Activity</p>
+                  <p className="text-xs text-brand-muted mb-4">Total calls made and their outcomes.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Number of Dials" required>
+                      <input type="number" min="0" className="input-field" value={form.dials} onChange={e => updateForm('dials', e.target.value)} placeholder="0" required />
+                    </Field>
+                    <Field label="No Answers" required>
+                      <input type="number" min="0" className="input-field" value={form.noAnswers} onChange={e => updateForm('noAnswers', e.target.value)} placeholder="0" required />
+                    </Field>
+                    <Field label="Qualified Conversations" required>
+                      <input type="number" min="0" className="input-field" value={form.qualifiedConvos} onChange={e => updateForm('qualifiedConvos', e.target.value)} placeholder="0" required />
+                    </Field>
+                    <Field label="Unqualified Leads" required>
+                      <input type="number" min="0" className="input-field" value={form.unqualifiedLeads} onChange={e => updateForm('unqualifiedLeads', e.target.value)} placeholder="0" required />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Bookings */}
+                <div className="bg-brand-darker border border-brand-slate/30 rounded-xl p-4 mb-2">
+                  <p className="text-sm font-semibold text-white mb-1">📅 Calls Booked</p>
+                  <p className="text-xs text-brand-muted mb-4">TC = Triage Call, SC = Sales Call. Split by source.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="TC Booked (Workshop)">
+                      <input type="number" min="0" className="input-field" value={form.tcBookedWorkshop} onChange={e => updateForm('tcBookedWorkshop', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="TC Booked (Pipeline)">
+                      <input type="number" min="0" className="input-field" value={form.tcBookedPipeline} onChange={e => updateForm('tcBookedPipeline', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="SC Booked (Workshop)">
+                      <input type="number" min="0" className="input-field" value={form.scBookedWorkshop} onChange={e => updateForm('scBookedWorkshop', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="SC Booked (Other)">
+                      <input type="number" min="0" className="input-field" value={form.scBooked} onChange={e => updateForm('scBooked', e.target.value)} placeholder="0" />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Follow-Ups */}
+                <div className="bg-brand-darker border border-brand-slate/30 rounded-xl p-4 mb-2">
+                  <p className="text-sm font-semibold text-white mb-1">🔁 Follow-Ups</p>
+                  <p className="text-xs text-brand-muted mb-4">Follow-up call volume and conversions.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Follow-Ups Called" required>
+                      <input type="number" min="0" className="input-field" value={form.followUpsCalled} onChange={e => updateForm('followUpsCalled', e.target.value)} placeholder="0" required />
+                    </Field>
+                    <div className="hidden md:block" />
+                    <Field label="TCs Booked from Follow-Ups">
+                      <input type="number" min="0" className="input-field" value={form.tcFromFollowUps} onChange={e => updateForm('tcFromFollowUps', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="SCs Booked from Follow-Ups">
+                      <input type="number" min="0" className="input-field" value={form.scFromFollowUps} onChange={e => updateForm('scFromFollowUps', e.target.value)} placeholder="0" />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Disposition */}
+                <div className="bg-brand-darker border border-brand-slate/30 rounded-xl p-4 mb-2">
+                  <p className="text-sm font-semibold text-white mb-1">🏷️ Dispositions</p>
+                  <p className="text-xs text-brand-muted mb-4">Other call outcomes.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Not Interested">
+                      <input type="number" min="0" className="input-field" value={form.notInterested} onChange={e => updateForm('notInterested', e.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="Call-Back Requests">
+                      <input type="number" min="0" className="input-field" value={form.callBackRequests} onChange={e => updateForm('callBackRequests', e.target.value)} placeholder="0" />
+                    </Field>
+                  </div>
+                </div>
+
+                <Field label="Notes (optional)">
+                  <textarea className="input-field min-h-[60px]" value={form.notes} onChange={e => updateForm('notes', e.target.value)} placeholder="Anything notable about today's calls?" />
                 </Field>
               </>
             )}

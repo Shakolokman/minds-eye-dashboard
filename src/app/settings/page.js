@@ -90,6 +90,8 @@ export default function SettingsPage() {
                   <option value="outbound">Outbound</option>
                   <option value="triager">Triager</option>
                   <option value="closer">Closer</option>
+                  <option value="phone_setter">Phone Setter</option>
+                  <option value="call_tracker">Call Tracker</option>
                 </select>
               </div>
               <button type="submit" className="btn-gold text-sm" disabled={loading}>{loading ? 'Saving...' : 'Add'}</button>
@@ -122,6 +124,8 @@ export default function SettingsPage() {
                     <option value="outbound">Outbound</option>
                     <option value="triager">Triager</option>
                     <option value="closer">Closer</option>
+                    <option value="phone_setter">Phone Setter</option>
+                    <option value="call_tracker">Call Tracker</option>
                   </select>
                 ) : (
                   <button
