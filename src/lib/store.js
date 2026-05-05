@@ -508,23 +508,6 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
     if (cash > 0) return s + cash;
     return s;
   }, 0);
-
-  // Unmatched high-ticket Stripe payments — count as revenue without closer attribution.
-  // Excludes low-ticket (<$100, handled separately as lowTicketRevenue) and refunds (<0).
-  const closedDealEmails = new Set(
-    closedDeals
-      .map(e => (e.leadEmail || '').toLowerCase().trim())
-      .filter(Boolean)
-  );
-  const unmatchedStripePayments = stripePayments.filter(p => {
-    if (p.status !== 'succeeded') return false;
-    const amt = parseFloat(p.amount) || 0;
-    if (amt < 100) return false; // low-ticket counted via lowTicketRevenue
-    const email = (p.customerEmail || '').toLowerCase().trim();
-    return email && !closedDealEmails.has(email);
-  });
-  const unmatchedStripeRevenue = unmatchedStripePayments.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-  const unmatchedStripeCount = unmatchedStripePayments.length;
   const totalCashCollected = closedDeals.reduce((s, e) => {
     const cash = parseFloat(e.cashCollected) || 0;
     return s + Math.max(0, cash);
@@ -538,13 +521,9 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const lowTicketRevenue = stripePayments
     .filter(p => p.status === 'succeeded' && (parseFloat(p.amount) || 0) < 100)
     .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-  const totalRevenueWithLT = totalRevenue + lowTicketRevenue + unmatchedStripeRevenue;
+  const totalRevenueWithLT = totalRevenue + lowTicketRevenue;
   const totalCashWithWire = totalCashCollected + wireCash;
   const allCashTotal = totalCashWithWire + stripeCashTotal;
-  // Effective deal count includes unmatched Stripe payments for revenue display purposes.
-  // Per-close averages stay tied to attributed EOD closes — mixing in unattributed
-  // payments distorts closer performance metrics.
-  const effectiveClosedCount = totalClosed + unmatchedStripeCount;
   const avgCashPerClose = totalClosed > 0 ? allCashTotal / totalClosed : 0;
   const avgRevPerClose = totalClosed > 0 ? totalRevenueWithLT / totalClosed : 0;
   const cashToRevPercent = totalRevenueWithLT > 0 ? (allCashTotal / totalRevenueWithLT * 100) : 0;
@@ -605,7 +584,7 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
     replyRate, allShowUpRate,
     triageOnCalendar, triageLiveCalls, triageNoShows, triageShowUpRate, triageQualified, triageBookedSC,
     closerOnCalendar, closerLiveCalls, closerNoShows, closerShowUpRate,
-    totalClosed, closeRate, totalRevenue, totalRevenueWithLT, lowTicketRevenue, unmatchedStripeRevenue, unmatchedStripeCount, effectiveClosedCount, totalCashCollected, wireCash, stripeCashTotal, totalCashWithWire, allCashTotal,
+    totalClosed, closeRate, totalRevenue, totalRevenueWithLT, lowTicketRevenue, totalCashCollected, wireCash, stripeCashTotal, totalCashWithWire, allCashTotal,
     avgCashPerClose, avgRevPerClose, cashToRevPercent,
     pifDeals, splitDeals, depositDeals,
     dmToLinkCR, linkToBookedCR, tcToScCR,
