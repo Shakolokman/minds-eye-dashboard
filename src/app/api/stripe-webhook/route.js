@@ -35,8 +35,17 @@ export async function POST(request) {
   try {
     switch (event.type) {
       // One-time payments via Checkout
+      // NOTE: For subscription mode, we skip this event entirely — the first
+      // payment is captured by `invoice.payment_succeeded` (with
+      // billing_reason === 'subscription_create' marking it as the first).
+      // Recording both events caused duplicate rows since the IDs differ
+      // (cs_live_... vs pi_...) so upsert can't dedupe them.
       case 'checkout.session.completed': {
         const session = event.data.object;
+        if (session.mode === 'subscription') {
+          // Subscriptions are handled by invoice.payment_succeeded
+          break;
+        }
         if (session.payment_status === 'paid') {
           await savePayment({
             stripe_payment_id: session.payment_intent || session.id,
@@ -45,7 +54,7 @@ export async function POST(request) {
             customer_email: session.customer_details?.email || '',
             amount: (session.amount_total || 0) / 100,
             currency: (session.currency || 'usd').toUpperCase(),
-            payment_type: session.mode === 'subscription' ? 'recurring' : 'one_time',
+            payment_type: 'one_time',
             plan_name: await getProductName(session),
             status: 'succeeded',
             stripe_event: event.type,
