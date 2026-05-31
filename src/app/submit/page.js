@@ -50,6 +50,7 @@ export default function SubmitPage() {
   // Map: member name → array of allowed roles
   const MULTI_ROLE = {
     'Shako Lokman': ['closer', 'triager'],
+    'Tobias Dachtler': ['setter', 'phone_setter'],
   };
 
   // Form state
