@@ -480,7 +480,30 @@ function getDateRange(preset) {
   return { start, end };
 }
 
-// ============ METRICS CALCULATION (unchanged) ============
+// ============ METRICS CALCULATION ============
+
+// Revenue for a single closed closer entry. THE canonical priority chain —
+// used by both the dashboard total and the per-closer cards so they never drift:
+//   1. explicit deal size (Stripe Split, Wire, or manual)
+//   2. Stripe/FanBasis PIF with no deal size → matched payment amount by email
+//   3. fallback to cash collected (legacy wire entries)
+function entryRevenue(e, stripePayments = []) {
+  const dealSize = parseFloat(e.totalDealSize) || 0;
+  if (dealSize > 0) return dealSize;
+  if ((e.paymentMethod === 'stripe' || e.paymentMethod === 'fanbasis') && e.paymentType === 'pif') {
+    const email = (e.leadEmail || '').toLowerCase().trim();
+    if (email) {
+      const matchedPayment = stripePayments.find(p =>
+        p.status === 'succeeded' &&
+        (p.customerEmail || '').toLowerCase().trim() === email
+      );
+      if (matchedPayment) return parseFloat(matchedPayment.amount) || 0;
+    }
+    return 0; // said Stripe/FanBasis PIF but no match → skip
+  }
+  const cash = parseFloat(e.cashCollected) || 0;
+  return cash > 0 ? cash : 0;
+}
 
 function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const setterEntries = entries.filter(e => e.formType === 'setter');
@@ -517,27 +540,7 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const totalClosed = closedDeals.length;
   const closeRate = closerLiveCalls > 0 ? (totalClosed / closerLiveCalls * 100) : 0;
 
-  const totalRevenue = closedDeals.reduce((s, e) => {
-    const dealSize = parseFloat(e.totalDealSize) || 0;
-    const cash = parseFloat(e.cashCollected) || 0;
-    // Use deal size if provided (Stripe Split, Wire, or manually entered)
-    if (dealSize > 0) return s + dealSize;
-    // For Stripe/FanBasis PIF with no deal size, find matching payment amount
-    if ((e.paymentMethod === 'stripe' || e.paymentMethod === 'fanbasis') && e.paymentType === 'pif') {
-      const email = (e.leadEmail || '').toLowerCase().trim();
-      if (email) {
-        const matchedPayment = stripePayments.find(p =>
-          p.status === 'succeeded' &&
-          (p.customerEmail || '').toLowerCase().trim() === email
-        );
-        if (matchedPayment) return s + (parseFloat(matchedPayment.amount) || 0);
-      }
-      // No Stripe match — fall through to cash/wire fallback below
-    }
-    // Fallback to cash collected from closer entry
-    if (cash > 0) return s + cash;
-    return s;
-  }, 0);
+  const totalRevenue = closedDeals.reduce((s, e) => s + entryRevenue(e, stripePayments), 0);
   const totalCashCollected = closedDeals.reduce((s, e) => {
     const cash = parseFloat(e.cashCollected) || 0;
     return s + Math.max(0, cash);
@@ -637,5 +640,5 @@ export {
   getWireTransfers, addWireTransfer, deleteWireTransfer,
   getStripePayments,
   matchStripeToClosers, findMismatches,
-  filterByDateRange, getDateRange, calculateMetrics,
+  filterByDateRange, getDateRange, calculateMetrics, entryRevenue,
 };
