@@ -294,21 +294,21 @@ export default function SubmitPage() {
                     {form.closed === 'yes' && (
                       <>
                         {/* Step 1: Payment Method */}
-                        <RadioGroup label="Payment method?" required options={[{value:'stripe',label:'💳 Stripe'},{value:'wire',label:'🏦 Wire Transfer'}]} value={form.paymentMethod} onChange={v => { updateForm('paymentMethod', v); updateForm('paymentType', ''); }} />
+                        <RadioGroup label="Payment method?" required options={[{value:'fanbasis',label:'🟢 FanBasis'},{value:'stripe',label:'💳 Stripe'},{value:'wire',label:'🏦 Wire Transfer'}]} value={form.paymentMethod} onChange={v => { updateForm('paymentMethod', v); updateForm('paymentType', ''); }} />
 
-                        {/* Step 2: If Stripe → PIF or Split? */}
-                        {form.paymentMethod === 'stripe' && (
+                        {/* Step 2: If FanBasis or Stripe → PIF or Split? (same auto-pull flow) */}
+                        {(form.paymentMethod === 'fanbasis' || form.paymentMethod === 'stripe') && (
                           <>
                             <RadioGroup label="Payment type?" required options={[{value:'pif',label:'PIF (Paid in Full)'},{value:'split',label:'Split / Deposit'}]} value={form.paymentType} onChange={v => updateForm('paymentType', v)} />
 
                             {/* PIF via Stripe — auto-pulled but allow manual override */}
                             {form.paymentType === 'pif' && (
                               <>
-                                <Field label="Total Deal Size (optional — auto-pulled from Stripe if left empty)">
-                                  <input type="number" min="0" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder="$ leave empty if Stripe handles it" />
+                                <Field label={`Total Deal Size (optional — auto-pulled from ${form.paymentMethod === 'fanbasis' ? 'FanBasis' : 'Stripe'} if left empty)`}>
+                                  <input type="number" min="0" className="input-field" value={form.totalDealSize} onChange={e => updateForm('totalDealSize', e.target.value)} placeholder={`$ leave empty if ${form.paymentMethod === 'fanbasis' ? 'FanBasis' : 'Stripe'} handles it`} />
                                 </Field>
                                 <div className="bg-emerald-900/20 border border-emerald-600/30 rounded-lg p-4">
-                                  <p className="text-sm font-medium text-emerald-400 mb-1">💳 Cash auto-pulled from Stripe</p>
+                                  <p className="text-sm font-medium text-emerald-400 mb-1">💰 Cash auto-pulled from {form.paymentMethod === 'fanbasis' ? 'FanBasis' : 'Stripe'}</p>
                                   <p className="text-xs text-emerald-400/70">Cash collected will be imported automatically. Enter deal size above if payment came through PayPal or another channel.</p>
                                 </div>
                               </>
@@ -324,7 +324,7 @@ export default function SubmitPage() {
                                   <textarea className="input-field min-h-[60px]" value={form.paymentDetails} onChange={e => updateForm('paymentDetails', e.target.value)} placeholder='e.g. "$2,000 × 3 every 30 days"' />
                                 </Field>
                                 <div className="bg-emerald-900/20 border border-emerald-600/30 rounded-lg p-3">
-                                  <p className="text-xs text-emerald-400">💳 First payment and future recurring payments will be auto-tracked from Stripe.</p>
+                                  <p className="text-xs text-emerald-400">💰 First payment and future recurring payments will be auto-tracked from {form.paymentMethod === 'fanbasis' ? 'FanBasis' : 'Stripe'}.</p>
                                 </div>
                               </>
                             )}

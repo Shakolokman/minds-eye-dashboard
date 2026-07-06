@@ -285,6 +285,7 @@ async function getStripePayments() {
     return (data || []).map(row => ({
       id: row.id,
       stripePaymentId: row.stripe_payment_id,
+      processor: row.processor || 'stripe',
       customerName: row.customer_name,
       customerEmail: row.customer_email,
       amount: row.amount,
@@ -372,7 +373,7 @@ function findMismatches(stripePayments, closerEntries, team) {
   const closerNoPayment = closerEntries
     .filter(e => {
       if (e.closed !== 'yes') return false;
-      if (e.paymentMethod !== 'stripe') return false;
+      if (e.paymentMethod !== 'stripe' && e.paymentMethod !== 'fanbasis') return false;
       const email = (e.leadEmail || '').toLowerCase().trim();
       return email && !stripeEmails.has(email);
     })
@@ -492,8 +493,8 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
     const cash = parseFloat(e.cashCollected) || 0;
     // Use deal size if provided (Stripe Split, Wire, or manually entered)
     if (dealSize > 0) return s + dealSize;
-    // For Stripe PIF with no deal size, find matching Stripe payment amount
-    if (e.paymentMethod === 'stripe' && e.paymentType === 'pif') {
+    // For Stripe/FanBasis PIF with no deal size, find matching payment amount
+    if ((e.paymentMethod === 'stripe' || e.paymentMethod === 'fanbasis') && e.paymentType === 'pif') {
       const email = (e.leadEmail || '').toLowerCase().trim();
       if (email) {
         const matchedPayment = stripePayments.find(p =>

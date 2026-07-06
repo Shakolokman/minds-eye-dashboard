@@ -7,6 +7,8 @@ import { getTeam, getEntries, getWireTransfers, addWireTransfer, deleteWireTrans
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
 const METHOD_STYLES = {
+  'FanBasis': 'bg-emerald-900/30 text-emerald-400',
+  'Stripe': 'bg-purple-900/30 text-purple-400',
   'Stripe (auto)': 'bg-purple-900/30 text-purple-400',
   'Stripe (manual)': 'bg-violet-900/30 text-violet-400',
   'Wire Transfer': 'bg-blue-900/30 text-blue-400',
@@ -137,7 +139,7 @@ export default function PaymentsPage() {
         client: p.customerName || p.customerEmail || '—',
         email: p.customerEmail,
         amount: amount,
-        method: 'Stripe',
+        method: p.processor === 'fanbasis' ? 'FanBasis' : 'Stripe',
         paymentType: TYPE_LABELS[p.paymentType] || p.paymentType,
         status: p.status,
         details: isLowTicket ? 'Workshop/LT' : (p.planName || TYPE_LABELS[p.paymentType] || ''),
@@ -264,7 +266,7 @@ export default function PaymentsPage() {
       <div className="bg-brand-surface border border-brand-slate/30 rounded-xl p-4 mb-6 flex items-center gap-3">
         <div className="w-10 h-10 rounded-lg bg-purple-900/30 flex items-center justify-center text-lg">💳</div>
         <div className="flex-1">
-          <p className="text-sm font-medium text-white">Stripe Integration</p>
+          <p className="text-sm font-medium text-white">Payment Integrations (FanBasis + Stripe)</p>
           <p className="text-xs text-brand-muted">
             {stripePayments.length > 0
               ? `${stripePayments.length} payment${stripePayments.length === 1 ? '' : 's'} imported · ${stripeCloserMatch.size} matched to closers`
