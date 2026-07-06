@@ -165,7 +165,7 @@ export default function Dashboard() {
     if (!mounted) return [];
     const today = new Date().toISOString().split('T')[0];
     const submittedToday = new Set(allEntries.filter(e => e.date === today).map(e => e.memberId));
-    return team.filter(m => !submittedToday.has(m.id) && (m.role === 'setter' || m.role === 'outbound'));
+    return team.filter(m => !submittedToday.has(m.id) && (m.roles || [m.role]).some(r => r === 'setter' || r === 'outbound'));
   }, [allEntries, team, mounted]);
 
   // Payment mismatch detection
@@ -295,7 +295,7 @@ export default function Dashboard() {
 
       {/* Individual Closer Performance */}
       {(() => {
-        const currentCloserIds = new Set(team.filter(m => m.role === 'closer').map(m => m.id));
+        const currentCloserIds = new Set(team.filter(m => (m.roles || [m.role]).includes('closer')).map(m => m.id));
         const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'closer').map(e => e.memberId));
         const allIds = new Set([...currentCloserIds, ...entryMemberIds]);
         if (allIds.size === 0) return null;
@@ -436,7 +436,7 @@ export default function Dashboard() {
 
       {/* Individual Triager Performance */}
       {(() => {
-        const currentTriagerIds = new Set(team.filter(m => m.role === 'triager').map(m => m.id));
+        const currentTriagerIds = new Set(team.filter(m => (m.roles || [m.role]).includes('triager')).map(m => m.id));
         const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'triager' || e.formType === 'triage').map(e => e.memberId));
         const allIds = new Set([...currentTriagerIds, ...entryMemberIds]);
         if (allIds.size === 0) return null;
@@ -502,7 +502,7 @@ export default function Dashboard() {
 
       {/* Individual Phone Setter Performance */}
       {(() => {
-        const currentPhoneSetterIds = new Set(team.filter(m => m.role === 'phone_setter').map(m => m.id));
+        const currentPhoneSetterIds = new Set(team.filter(m => (m.roles || [m.role]).includes('phone_setter')).map(m => m.id));
         const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'phone_setter').map(e => e.memberId));
         const allIds = new Set([...currentPhoneSetterIds, ...entryMemberIds]);
         if (allIds.size === 0) return null;
@@ -641,7 +641,7 @@ export default function Dashboard() {
 
       {/* Individual DM Setter / Outbound Performance */}
       {(() => {
-        const currentSetterIds = new Set(team.filter(m => m.role === 'setter' || m.role === 'outbound').map(m => m.id));
+        const currentSetterIds = new Set(team.filter(m => (m.roles || [m.role]).some(r => r === 'setter' || r === 'outbound')).map(m => m.id));
         const entryMemberIds = new Set(filteredEntries.filter(e => e.formType === 'setter' || e.formType === 'outbound').map(e => e.memberId));
         const allIds = new Set([...currentSetterIds, ...entryMemberIds]);
         if (allIds.size === 0) return null;

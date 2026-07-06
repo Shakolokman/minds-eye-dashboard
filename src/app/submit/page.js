@@ -46,13 +46,6 @@ export default function SubmitPage() {
   const [mounted, setMounted] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // Members who can submit multiple report types
-  // Map: member name → array of allowed roles
-  const MULTI_ROLE = {
-    'Shako Lokman': ['closer', 'triager'],
-    'Tobias Dachtler': ['setter', 'phone_setter'],
-  };
-
   // Form state
   const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
@@ -78,18 +71,19 @@ export default function SubmitPage() {
   useEffect(() => { async function load() { setTeam(await getTeam()); setMounted(true); } load(); }, []);
 
   const member = team.find(m => m.id === selectedMember);
-  const multiRoles = member ? MULTI_ROLE[member.name] : null;
-  const role = multiRoles ? selectedRole : member?.role;
+  const memberRoles = (member?.roles && member.roles.length) ? member.roles : (member?.role ? [member.role] : []);
+  const multiRoles = memberRoles.length > 1 ? memberRoles : null;
+  const role = multiRoles ? selectedRole : memberRoles[0];
 
   // When selecting a member, auto-set role if single-role, clear if multi-role
   const handleMemberSelect = (id) => {
     setSelectedMember(id);
     const m = team.find(t => t.id === id);
-    const mr = m ? MULTI_ROLE[m.name] : null;
-    if (mr) {
+    const mr = (m?.roles && m.roles.length) ? m.roles : (m?.role ? [m.role] : []);
+    if (mr.length > 1) {
       setSelectedRole(''); // force them to pick
     } else {
-      setSelectedRole(m?.role || '');
+      setSelectedRole(mr[0] || '');
     }
   };
 
@@ -156,7 +150,7 @@ export default function SubmitPage() {
               </div>
               <div>
                 <p className={`text-sm font-medium ${selectedMember === m.id ? 'text-brand-gold' : 'text-white'}`}>{m.name}</p>
-                <p className="text-xs text-brand-muted">{MULTI_ROLE[m.name] ? MULTI_ROLE[m.name].map(r => ROLE_LABELS[r]).join(' / ') : ROLE_LABELS[m.role]}</p>
+                <p className="text-xs text-brand-muted">{((m.roles && m.roles.length ? m.roles : [m.role]).map(r => ROLE_LABELS[r]).join(' / '))}</p>
               </div>
             </button>
           ))}

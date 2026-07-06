@@ -20,6 +20,16 @@ const ROLE_LABELS = {
   phone_setter: 'Phone Setter',
 };
 
+// All assignable roles, in the order shown in the Settings + Submit UIs.
+const ALL_ROLES = ['closer', 'triager', 'phone_setter', 'setter', 'outbound', 'call_tracker'];
+
+// Normalize a member row so `roles` is always a non-empty array and `role`
+// (the primary, used for display/colors/filtering) is roles[0].
+function withRoles(m) {
+  const roles = (Array.isArray(m.roles) && m.roles.length) ? m.roles : (m.role ? [m.role] : []);
+  return { ...m, roles, role: roles[0] || m.role };
+}
+
 const ROLE_COLORS = {
   closer: 'bg-amber-600',
   setter: 'bg-purple-600',
@@ -82,10 +92,10 @@ async function getTeam() {
       .select('*')
       .order('created_at', { ascending: true });
     if (error) throw error;
-    return data || DEFAULT_TEAM;
+    return (data || DEFAULT_TEAM).map(withRoles);
   } catch (err) {
     console.error('getTeam error:', err);
-    return DEFAULT_TEAM;
+    return DEFAULT_TEAM.map(withRoles);
   }
 }
 
@@ -96,18 +106,22 @@ async function saveTeam(team) {
 async function addTeamMember(member) {
   if (!supabase) return null;
   try {
+    const roles = (Array.isArray(member.roles) && member.roles.length)
+      ? member.roles
+      : (member.role ? [member.role] : ['setter']);
     const { data, error } = await supabase
       .from('team_members')
       .insert({
         name: member.name,
         email: member.email,
-        role: member.role,
+        role: roles[0], // primary role (backward compat)
+        roles,
         color: MEMBER_COLORS[Math.floor(Math.random() * MEMBER_COLORS.length)],
       })
       .select()
       .single();
     if (error) throw error;
-    return data;
+    return withRoles(data);
   } catch (err) {
     console.error('addTeamMember error:', err);
     return null;
@@ -132,11 +146,26 @@ async function updateTeamMemberRole(id, role) {
   try {
     const { error } = await supabase
       .from('team_members')
-      .update({ role })
+      .update({ role, roles: [role] })
       .eq('id', id);
     if (error) throw error;
   } catch (err) {
     console.error('updateTeamMemberRole error:', err);
+  }
+}
+
+// Set the full list of roles for a member. role stays as roles[0] (primary).
+async function updateTeamMemberRoles(id, roles) {
+  if (!supabase) return;
+  try {
+    const clean = (Array.isArray(roles) && roles.length) ? roles : ['setter'];
+    const { error } = await supabase
+      .from('team_members')
+      .update({ role: clean[0], roles: clean })
+      .eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('updateTeamMemberRoles error:', err);
   }
 }
 
@@ -601,9 +630,9 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
 }
 
 export {
-  DEFAULT_TEAM, ROLE_LABELS, ROLE_COLORS, MEMBER_COLORS,
+  DEFAULT_TEAM, ROLE_LABELS, ROLE_COLORS, MEMBER_COLORS, ALL_ROLES,
   WEEKLY_KPIS, DAILY_KPIS, getKpiColor, KPI_BG, KPI_TEXT,
-  getTeam, saveTeam, addTeamMember, removeTeamMember, updateTeamMemberRole,
+  getTeam, saveTeam, addTeamMember, removeTeamMember, updateTeamMemberRole, updateTeamMemberRoles,
   getEntries, addEntry, deleteEntry,
   getWireTransfers, addWireTransfer, deleteWireTransfer,
   getStripePayments,
