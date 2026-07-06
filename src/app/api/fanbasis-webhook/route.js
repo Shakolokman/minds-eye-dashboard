@@ -21,10 +21,21 @@ export async function POST(request) {
   // secret may not be set yet; we accept + log so no real payment is dropped,
   // then lock this down the moment FANBASIS_WEBHOOK_SECRET is in Vercel.
   if (webhookSecret) {
-    const expected = crypto.createHmac('sha256', webhookSecret).update(body).digest('hex');
-    const provided = (sig || '').replace(/^sha256=/, '');
-    const ok = provided.length === expected.length &&
-      crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+    // Accept the provided signature against the raw body as either hex or
+    // base64 (providers differ), tolerating an optional "sha256=" prefix and,
+    // for a Stripe-style "t=..,v1=.." header, the v1 segment.
+    const provided = (sig || '')
+      .replace(/^sha256=/, '')
+      .replace(/.*v1=([^,]+).*/, '$1')
+      .trim();
+    const candidates = [
+      crypto.createHmac('sha256', webhookSecret).update(body).digest('hex'),
+      crypto.createHmac('sha256', webhookSecret).update(body).digest('base64'),
+    ];
+    const ok = provided.length > 0 && candidates.some(exp =>
+      exp.length === provided.length &&
+      crypto.timingSafeEqual(Buffer.from(exp), Buffer.from(provided))
+    );
     if (!ok) {
       console.error('FanBasis webhook signature mismatch');
       return new Response('Invalid signature', { status: 400 });
