@@ -1,10 +1,11 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import StatCard from '@/components/StatCard';
-import { getClients, getStripePayments, getTeam, addClient, updateClient, deleteClient, calculateClientDashboard } from '@/lib/store';
+import { getClients, getStripePayments, getTeam, addClient, updateClient, deleteClient, computeClientDerived, calculateClientDashboard } from '@/lib/store';
 
 const fmtUSD = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString('en-US')}`;
-const fmtDay = (s) => { if (!s) return '—'; const [y, m, d] = String(s).split('T')[0].split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+const fmtShort = (s) => { if (!s) return '—'; const [y, m, d] = String(s).split('T')[0].split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+const fmtLong = (s) => { if (!s) return '—'; const [y, m, d] = String(s).split('T')[0].split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
 
 const STATUS_STYLES = {
   Active: 'bg-emerald-900/30 text-emerald-400',
@@ -32,6 +33,15 @@ function daysColor(d) {
   return 'text-brand-muted';
 }
 
+// Newest onboarded first; clients with no onboarding date fall to the bottom.
+function byNewest(a, b) {
+  const av = a.onboardingDate || '', bv = b.onboardingDate || '';
+  if (av && bv) return bv.localeCompare(av);
+  if (av) return -1;
+  if (bv) return 1;
+  return 0;
+}
+
 export default function ClientsPage() {
   const [clients, setClients] = useState([]);
   const [stripePayments, setStripePayments] = useState([]);
@@ -41,18 +51,18 @@ export default function ClientsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm());
-  const [showArchived, setShowArchived] = useState(false);
 
   async function reload() {
     const [c, s, t] = await Promise.all([getClients(), getStripePayments(), getTeam()]);
     setClients(c); setStripePayments(s); setTeam(t);
   }
-
   useEffect(() => { (async () => { await reload(); setMounted(true); })(); }, []);
 
-  const dash = useMemo(
-    () => calculateClientDashboard(showArchived ? clients : clients.filter(c => !c.archived), stripePayments),
-    [clients, stripePayments, showArchived]
+  const dash = useMemo(() => calculateClientDashboard(clients, stripePayments), [clients, stripePayments]);
+  const activeRows = useMemo(() => [...dash.rows].sort(byNewest), [dash.rows]);
+  const pastRows = useMemo(
+    () => clients.filter(c => c.archived).map(c => computeClientDerived(c, stripePayments)).sort(byNewest),
+    [clients, stripePayments]
   );
 
   const closerNames = useMemo(() => team.filter(m => (m.roles || [m.role]).includes('closer')).map(m => m.name), [team]);
@@ -83,24 +93,16 @@ export default function ClientsPage() {
     if (!form.name.trim()) return;
     setSaving(true);
     const payload = {
-      name: form.name.trim(),
-      email: form.email.trim(),
-      onboardingDate: form.onboardingDate || null,
-      source: form.source.trim(),
-      dealSize: form.dealSize === '' ? null : form.dealSize,
-      installments: form.installments
-        .filter(i => i.amount !== '' && i.amount != null)
+      name: form.name.trim(), email: form.email.trim(), onboardingDate: form.onboardingDate || null,
+      source: form.source.trim(), dealSize: form.dealSize === '' ? null : form.dealSize,
+      installments: form.installments.filter(i => i.amount !== '' && i.amount != null)
         .map(i => ({ amount: i.amount, due_date: i.due_date || null, paid: !!i.paid, manual: true })),
-      coachingStart: form.coachingStart || null,
-      coachingEnd: form.coachingEnd || null,
-      lastSession: form.lastSession || null,
-      revokeDate: form.revokeDate || null,
-      notes: form.notes.trim(),
-      paymentEmails: form.paymentEmailsText.split(',').map(s => s.trim()).filter(Boolean),
+      coachingStart: form.coachingStart || null, coachingEnd: form.coachingEnd || null,
+      lastSession: form.lastSession || null, revokeDate: form.revokeDate || null,
+      notes: form.notes.trim(), paymentEmails: form.paymentEmailsText.split(',').map(s => s.trim()).filter(Boolean),
       archived: editingId ? !!clients.find(c => c.id === editingId)?.archived : false,
     };
-    if (editingId) await updateClient(editingId, payload);
-    else await addClient(payload);
+    if (editingId) await updateClient(editingId, payload); else await addClient(payload);
     await reload();
     setSaving(false);
     closeForm();
@@ -108,11 +110,10 @@ export default function ClientsPage() {
 
   const handleDelete = async (row) => {
     if (!confirm(`Delete ${row.name}? This cannot be undone.`)) return;
-    await deleteClient(row.id);
-    await reload();
+    await deleteClient(row.id); await reload();
   };
 
-  const toggleArchive = async (row) => {
+  const toggleFinished = async (row) => {
     await updateClient(row.id, {
       name: row.name, email: row.email, onboardingDate: row.onboardingDate, source: row.source,
       dealSize: row.dealSize, installments: row.installments, coachingStart: row.coachingStart,
@@ -121,6 +122,62 @@ export default function ClientsPage() {
     });
     await reload();
   };
+
+  const clientRow = (r, past) => (
+    <tr key={r.id} className={`border-b border-brand-slate/10 hover:bg-brand-slate/10 transition-colors ${past ? 'opacity-70' : ''}`}>
+      <td className="py-3 px-4">
+        <p className="text-white text-sm flex items-center gap-1.5">
+          {r.name}
+          {r.hasAutoMatch && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Payment auto-matched from Stripe/FanBasis" />}
+        </p>
+        {r.email && <p className="text-xs text-brand-muted">{r.email}</p>}
+      </td>
+      <td className="py-3 px-4 text-xs text-brand-muted">{r.source || '—'}</td>
+      <td className="py-3 px-4 whitespace-nowrap">
+        <span className="text-xs text-white">{fmtShort(r.coachingStart)}</span>
+        <span className="text-brand-muted text-xs mx-1">→</span>
+        <span className="text-xs text-white">{fmtShort(r.coachingEnd)}</span>
+      </td>
+      <td className={`py-3 px-4 text-right font-medium ${daysColor(r.daysUntilEnd)}`}>{r.daysUntilEnd == null ? '—' : `${r.daysUntilEnd}d`}</td>
+      <td className="py-3 px-4 text-right text-white">{fmtUSD(r.dealSize)}</td>
+      <td className="py-3 px-4 text-right text-emerald-400">{fmtUSD(r.totalPaid)}</td>
+      <td className={`py-3 px-4 text-right font-medium ${r.outstanding > 0 ? 'text-amber-400' : 'text-brand-muted'}`}>{r.outstanding == null ? '—' : fmtUSD(r.outstanding)}</td>
+      <td className="py-3 px-4"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_STYLES[r.status] || 'bg-brand-slate/40 text-brand-muted'}`}>{r.status}</span></td>
+      <td className="py-3 px-4"><span className={`text-xs px-2 py-0.5 rounded-full ${PAY_STYLES[r.paymentStatus] || 'bg-brand-slate/40 text-brand-muted'}`}>{r.paymentStatus}</span></td>
+      <td className="py-3 px-3 text-right whitespace-nowrap">
+        <button onClick={() => openEdit(r)} className="text-brand-muted hover:text-brand-gold transition-colors p-1.5 rounded-lg hover:bg-brand-gold/10" title="Edit">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+        </button>
+        <button onClick={() => toggleFinished(r)} className="text-brand-muted hover:text-blue-400 transition-colors p-1.5 rounded-lg hover:bg-blue-400/10" title={past ? 'Reactivate' : 'Mark as finished'}>
+          {past ? (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          ) : (
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          )}
+        </button>
+        <button onClick={() => handleDelete(r)} className="text-brand-muted hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-400/10" title="Delete">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        </button>
+      </td>
+    </tr>
+  );
+
+  const tableHead = (
+    <thead>
+      <tr className="text-brand-muted text-xs uppercase tracking-wider border-b border-brand-slate/30 bg-brand-darker/50">
+        <th className="text-left py-3 px-4">Client</th>
+        <th className="text-left py-3 px-4">Source</th>
+        <th className="text-left py-3 px-4">Coaching (start → end)</th>
+        <th className="text-right py-3 px-4">Days Left</th>
+        <th className="text-right py-3 px-4">Deal</th>
+        <th className="text-right py-3 px-4">Paid</th>
+        <th className="text-right py-3 px-4">Outstanding</th>
+        <th className="text-left py-3 px-4">Status</th>
+        <th className="text-left py-3 px-4">Payment</th>
+        <th className="text-right py-3 px-3 w-24"></th>
+      </tr>
+    </thead>
+  );
 
   if (!mounted) return <div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-2 border-brand-gold border-t-transparent rounded-full animate-spin" /></div>;
 
@@ -164,10 +221,10 @@ export default function ClientsPage() {
             <div className="divide-y divide-brand-slate/15">
               {dash.endingList.map(r => (
                 <button key={r.id} onClick={() => openEdit(r)} className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-brand-slate/10 transition-colors">
-                  <span className={`text-sm font-semibold w-14 flex-shrink-0 ${daysColor(r.daysUntilEnd)}`}>{r.daysUntilEnd}d left</span>
+                  <span className={`text-sm font-semibold w-16 flex-shrink-0 ${daysColor(r.daysUntilEnd)}`}>{r.daysUntilEnd}d left</span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-sm text-white truncate">{r.name}</span>
-                    <span className="block text-xs text-brand-muted">Ends {fmtDay(r.coachingEnd)} · revoke {fmtDay(r.revokeDate)}</span>
+                    <span className="block text-xs text-brand-muted">{fmtShort(r.coachingStart)} → {fmtLong(r.coachingEnd)} · revoke {fmtShort(r.revokeDate)}</span>
                   </span>
                 </button>
               ))}
@@ -197,68 +254,42 @@ export default function ClientsPage() {
         </div>
       </div>
 
-      {/* Client table */}
-      <div className="bg-brand-surface border border-brand-slate/30 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-brand-slate/20 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">All Clients</h3>
-          <label className="text-xs text-brand-muted flex items-center gap-1.5 cursor-pointer">
-            <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} className="accent-brand-gold" />
-            Show archived
-          </label>
+      {/* Active clients */}
+      <div className="bg-brand-surface border border-brand-slate/30 rounded-xl overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-brand-slate/20 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <h3 className="text-sm font-semibold text-white">Active Clients</h3>
+          <span className="text-xs text-brand-muted">({activeRows.length})</span>
+          <span className="text-xs text-brand-muted ml-auto">Newest first</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead>
-              <tr className="text-brand-muted text-xs uppercase tracking-wider border-b border-brand-slate/30 bg-brand-darker/50">
-                <th className="text-left py-3 px-4">Client</th>
-                <th className="text-left py-3 px-4">Source</th>
-                <th className="text-right py-3 px-4">Deal</th>
-                <th className="text-right py-3 px-4">Paid</th>
-                <th className="text-right py-3 px-4">Outstanding</th>
-                <th className="text-left py-3 px-4">Status</th>
-                <th className="text-right py-3 px-4">Days Left</th>
-                <th className="text-left py-3 px-4">Payment</th>
-                <th className="text-left py-3 px-4">Coaching End</th>
-                <th className="text-right py-3 px-3 w-20"></th>
-              </tr>
-            </thead>
+            {tableHead}
             <tbody>
-              {dash.rows.length === 0 ? (
-                <tr><td colSpan={10} className="text-brand-muted text-sm py-12 text-center">No clients yet. Click &quot;Add Client&quot; to start.</td></tr>
-              ) : dash.rows.map(r => (
-                <tr key={r.id} className={`border-b border-brand-slate/10 hover:bg-brand-slate/10 transition-colors ${r.archived ? 'opacity-50' : ''}`}>
-                  <td className="py-3 px-4">
-                    <p className="text-white text-sm flex items-center gap-1.5">
-                      {r.name}
-                      {r.hasAutoMatch && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="Payment auto-matched from Stripe/FanBasis" />}
-                    </p>
-                    {r.email && <p className="text-xs text-brand-muted">{r.email}</p>}
-                  </td>
-                  <td className="py-3 px-4 text-xs text-brand-muted">{r.source || '—'}</td>
-                  <td className="py-3 px-4 text-right text-white">{fmtUSD(r.dealSize)}</td>
-                  <td className="py-3 px-4 text-right text-emerald-400">{fmtUSD(r.totalPaid)}</td>
-                  <td className={`py-3 px-4 text-right font-medium ${r.outstanding > 0 ? 'text-amber-400' : 'text-brand-muted'}`}>{r.outstanding == null ? '—' : fmtUSD(r.outstanding)}</td>
-                  <td className="py-3 px-4"><span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_STYLES[r.status] || 'bg-brand-slate/40 text-brand-muted'}`}>{r.status}</span></td>
-                  <td className={`py-3 px-4 text-right font-medium ${daysColor(r.daysUntilEnd)}`}>{r.daysUntilEnd == null ? '—' : `${r.daysUntilEnd}d`}</td>
-                  <td className="py-3 px-4"><span className={`text-xs px-2 py-0.5 rounded-full ${PAY_STYLES[r.paymentStatus] || 'bg-brand-slate/40 text-brand-muted'}`}>{r.paymentStatus}</span></td>
-                  <td className="py-3 px-4 text-xs text-brand-muted whitespace-nowrap">{fmtDay(r.coachingEnd)}</td>
-                  <td className="py-3 px-3 text-right whitespace-nowrap">
-                    <button onClick={() => openEdit(r)} className="text-brand-muted hover:text-brand-gold transition-colors p-1.5 rounded-lg hover:bg-brand-gold/10" title="Edit">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    </button>
-                    <button onClick={() => toggleArchive(r)} className="text-brand-muted hover:text-blue-400 transition-colors p-1.5 rounded-lg hover:bg-blue-400/10" title={r.archived ? 'Unarchive' : 'Archive'}>
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
-                    </button>
-                    <button onClick={() => handleDelete(r)} className="text-brand-muted hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-400/10" title="Delete">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {activeRows.length === 0 ? (
+                <tr><td colSpan={10} className="text-brand-muted text-sm py-12 text-center">No active clients. Click &quot;Add Client&quot; to start.</td></tr>
+              ) : activeRows.map(r => clientRow(r, false))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Past clients */}
+      {pastRows.length > 0 && (
+        <div className="bg-brand-surface/60 border border-brand-slate/20 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-brand-slate/20 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-brand-muted" />
+            <h3 className="text-sm font-semibold text-brand-muted">Past Clients</h3>
+            <span className="text-xs text-brand-muted">({pastRows.length})</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              {tableHead}
+              <tbody>{pastRows.map(r => clientRow(r, true))}</tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Add / Edit modal */}
       {showForm && (
@@ -287,7 +318,6 @@ export default function ClientsPage() {
                   <input className="input-field" value={form.paymentEmailsText} onChange={e => setForm(f => ({ ...f, paymentEmailsText: e.target.value }))} placeholder="comma-separated, if they paid from another email" /></div>
               </div>
 
-              {/* Installments */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs text-brand-muted uppercase tracking-wider font-semibold">Installments</label>
@@ -316,7 +346,6 @@ export default function ClientsPage() {
                 <p className="text-[11px] text-brand-muted mt-1.5">Leave &quot;Paid&quot; unchecked and payments will tick themselves once a matching Stripe/FanBasis payment arrives. Check it to mark paid by hand.</p>
               </div>
 
-              {/* Coaching dates */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div><label className="text-xs text-brand-muted mb-1 block">Coaching Start</label>
                   <input type="date" className="input-field !py-2" value={form.coachingStart} onChange={e => setForm(f => ({ ...f, coachingStart: e.target.value }))} /></div>
