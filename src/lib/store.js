@@ -437,6 +437,344 @@ function findMismatches(stripePayments, closerEntries, team) {
   return { closerNoPayment, paymentNoCloser };
 }
 
+// ============ CLIENTS (coaching client tracker) ============
+// Replaces the MES_Client_Tracker Google Sheet. Installments are a flexible
+// JSONB array so a client can have any number of them (not capped at 3).
+
+async function getClients() {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .select('*')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email || '',
+      onboardingDate: row.onboarding_date,
+      source: row.source || '',
+      dealSize: row.deal_size,
+      installments: Array.isArray(row.installments) ? row.installments : [],
+      coachingStart: row.coaching_start,
+      coachingEnd: row.coaching_end,
+      lastSession: row.last_session,
+      revokeDate: row.revoke_date,
+      notes: row.notes || '',
+      paymentEmails: Array.isArray(row.payment_emails) ? row.payment_emails : [],
+      archived: !!row.archived,
+      timestamp: row.created_at,
+    }));
+  } catch (err) {
+    console.error('getClients error:', err);
+    return [];
+  }
+}
+
+// Map a UI client object → the DB column shape.
+function clientToRow(c) {
+  return {
+    name: c.name,
+    email: c.email || null,
+    onboarding_date: c.onboardingDate || null,
+    source: c.source || null,
+    deal_size: c.dealSize === '' || c.dealSize == null ? null : parseFloat(c.dealSize),
+    installments: (c.installments || []).map(i => ({
+      amount: i.amount === '' || i.amount == null ? 0 : parseFloat(i.amount),
+      due_date: i.due_date || null,
+      paid: !!i.paid,
+      paid_date: i.paid_date || null,
+      manual: i.manual !== false, // installments edited in the UI are manual truth
+    })),
+    coaching_start: c.coachingStart || null,
+    coaching_end: c.coachingEnd || null,
+    last_session: c.lastSession || null,
+    revoke_date: c.revokeDate || null,
+    notes: c.notes || null,
+    payment_emails: (c.paymentEmails || []).filter(Boolean),
+    archived: !!c.archived,
+  };
+}
+
+async function addClient(client) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .insert(clientToRow(client))
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.error('addClient error:', err);
+    return null;
+  }
+}
+
+async function updateClient(id, patch) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('clients')
+      .update(clientToRow(patch))
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  } catch (err) {
+    console.error('updateClient error:', err);
+    return null;
+  }
+}
+
+async function deleteClient(id) {
+  if (!supabase) return;
+  try {
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) throw error;
+  } catch (err) {
+    console.error('deleteClient error:', err);
+  }
+}
+
+// ---- Client derived values (the sheet's auto columns, in code) ----
+
+// Parse a 'YYYY-MM-DD' string as a LOCAL date (avoids UTC off-by-one).
+function parseDate(s) {
+  if (!s) return null;
+  if (s instanceof Date) return s;
+  const [y, m, d] = String(s).split('T')[0].split('-').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+function todayLocal() {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), n.getDate());
+}
+
+function daysBetween(a, b) {
+  return Math.round((a - b) / 86400000);
+}
+
+// Total of succeeded Stripe/FanBasis payments whose customer email matches this
+// client (primary email or any of the extra paymentEmails).
+function matchedPaymentTotal(client, stripePayments) {
+  const emails = new Set(
+    [client.email, ...(client.paymentEmails || [])]
+      .map(e => (e || '').toLowerCase().trim())
+      .filter(Boolean)
+  );
+  if (!emails.size) return 0;
+  return stripePayments
+    .filter(p => p.status === 'succeeded' && emails.has((p.customerEmail || '').toLowerCase().trim()))
+    .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+}
+
+// Resolve each installment's paid state by combining manual ticks with
+// auto-matched payments, then compute the sheet's derived fields for one client.
+function computeClientDerived(client, stripePayments = []) {
+  const today = todayLocal();
+  const insts = (client.installments || []).map(i => ({
+    amount: parseFloat(i.amount) || 0,
+    due_date: i.due_date || null,
+    paid: !!i.paid,
+    manual: i.manual !== false,
+    autoPaid: false,
+  }));
+
+  // Manual-paid amount is assumed already covered by real payments, so subtract
+  // it from the matched total before auto-applying the remainder to open ones.
+  const matchedTotal = matchedPaymentTotal(client, stripePayments);
+  const manualPaid = insts.filter(i => i.paid).reduce((s, i) => s + i.amount, 0);
+  let remainingAuto = Math.max(0, matchedTotal - manualPaid);
+  for (const i of insts) {
+    if (i.paid) continue;
+    if (i.amount > 0 && remainingAuto + 0.5 >= i.amount) {
+      i.autoPaid = true;
+      remainingAuto -= i.amount;
+    }
+  }
+
+  const isPaid = (i) => i.paid || i.autoPaid;
+  const totalPaid = insts.filter(isPaid).reduce((s, i) => s + i.amount, 0);
+  const dealSize = client.dealSize == null || client.dealSize === '' ? null : parseFloat(client.dealSize);
+  const outstanding = dealSize == null ? null : dealSize - totalPaid;
+
+  const start = parseDate(client.coachingStart);
+  const end = parseDate(client.coachingEnd);
+  let status;
+  if (!start || !end) status = 'Not Started';
+  else if (today < start) status = 'Not Started';
+  else if (today > end) status = 'Completed';
+  else status = 'Active';
+
+  const daysUntilEnd = end ? daysBetween(end, today) : null;
+
+  let paymentStatus;
+  if (outstanding != null && outstanding <= 0) paymentStatus = 'Paid';
+  else {
+    const anyOverdue = insts.some(i => {
+      const due = parseDate(i.due_date);
+      return due && due <= today && !isPaid(i) && i.amount > 0;
+    });
+    paymentStatus = anyOverdue ? 'Overdue' : 'On Track';
+  }
+
+  return {
+    ...client,
+    installments: insts,
+    totalPaid,
+    outstanding,
+    status,
+    daysUntilEnd,
+    paymentStatus,
+    matchedTotal,
+    hasAutoMatch: insts.some(i => i.autoPaid),
+  };
+}
+
+// Dashboard tiles + alert lists for the Clients tab (mirrors the sheet Dashboard).
+function calculateClientDashboard(clients, stripePayments = []) {
+  const rows = clients.filter(c => !c.archived).map(c => computeClientDerived(c, stripePayments));
+  const active = rows.filter(r => r.status === 'Active');
+  const activeClients = active.length;
+  const endingList = active
+    .filter(r => r.daysUntilEnd != null && r.daysUntilEnd >= 0 && r.daysUntilEnd <= 14)
+    .sort((a, b) => a.daysUntilEnd - b.daysUntilEnd);
+  const revokeThisWeek = active.filter(r => r.daysUntilEnd != null && r.daysUntilEnd >= 0 && r.daysUntilEnd <= 7).length;
+  const overdueList = rows
+    .filter(r => r.paymentStatus === 'Overdue')
+    .sort((a, b) => (b.outstanding || 0) - (a.outstanding || 0));
+  const activeRevenue = active.reduce((s, r) => s + (r.dealSize || 0), 0);
+  return {
+    rows,
+    activeClients,
+    endingIn14: endingList.length,
+    revokeThisWeek,
+    overduePayments: overdueList.length,
+    activeRevenue,
+    endingList,
+    overdueList,
+  };
+}
+
+// ---- Notifications (bell) ----
+
+// Most recent weekday strictly before today (yesterday, or Friday on a Mon/Sun).
+function lastWorkday() {
+  const d = todayLocal();
+  do { d.setDate(d.getDate() - 1); } while (d.getDay() === 0 || d.getDay() === 6);
+  return d;
+}
+
+function ymd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Roles expected to submit an EOD report every work day. Closers are excluded —
+// a no-report day may just mean they had no calls.
+const DAILY_EOD_ROLES = ['setter', 'triager', 'phone_setter'];
+
+const fmtMoney = (n) => `$${Math.round(n || 0).toLocaleString('en-US')}`;
+const fmtDay = (s) => { const d = parseDate(s); return d ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; };
+
+/**
+ * Build the notification list for the bell.
+ * Alert types: coaching_ending, revoke_skool, payment_overdue, payment_due, missing_eod.
+ * severity: 'high' | 'medium'
+ */
+function buildNotifications(clients, entries = [], team = [], stripePayments = []) {
+  const today = todayLocal();
+  const notes = [];
+  const rows = (clients || []).filter(c => !c.archived).map(c => computeClientDerived(c, stripePayments));
+
+  rows.forEach(r => {
+    // Coaching ending within 7 days
+    if (r.status === 'Active' && r.daysUntilEnd != null && r.daysUntilEnd >= 0 && r.daysUntilEnd <= 7) {
+      notes.push({
+        id: `ending:${r.id}`,
+        type: 'coaching_ending',
+        severity: r.daysUntilEnd <= 3 ? 'high' : 'medium',
+        title: `${r.name}'s coaching ends in ${r.daysUntilEnd} day${r.daysUntilEnd === 1 ? '' : 's'}`,
+        detail: `Ends ${fmtDay(r.coachingEnd)}`,
+        clientId: r.id,
+      });
+    }
+    // Revoke Skool access — only around the revoke date (window avoids nagging on old clients)
+    if (r.revokeDate) {
+      const rev = parseDate(r.revokeDate);
+      const d = daysBetween(rev, today);
+      if (d >= -3 && d <= 7) {
+        notes.push({
+          id: `revoke:${r.id}`,
+          type: 'revoke_skool',
+          severity: d <= 0 ? 'high' : 'medium',
+          title: d < 0
+            ? `Revoke Skool access for ${r.name} (was due ${fmtDay(r.revokeDate)})`
+            : `Revoke Skool access for ${r.name} ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}`,
+          detail: `Revoke date ${fmtDay(r.revokeDate)}`,
+          clientId: r.id,
+        });
+      }
+    }
+    // Payments — overdue, then upcoming this week
+    (r.installments || []).forEach((i, idx) => {
+      const due = parseDate(i.due_date);
+      const paid = i.paid || i.autoPaid;
+      if (!due || paid || !(i.amount > 0)) return;
+      const d = daysBetween(due, today);
+      if (d < 0 && (r.outstanding == null || r.outstanding > 0)) {
+        notes.push({
+          id: `overdue:${r.id}:${idx}`,
+          type: 'payment_overdue',
+          severity: 'high',
+          title: `${r.name} — payment overdue ${fmtMoney(i.amount)}`,
+          detail: `Was due ${fmtDay(i.due_date)}${r.outstanding != null ? ` · ${fmtMoney(r.outstanding)} outstanding` : ''}`,
+          clientId: r.id,
+        });
+      } else if (d >= 0 && d <= 7) {
+        notes.push({
+          id: `due:${r.id}:${idx}`,
+          type: 'payment_due',
+          severity: 'medium',
+          title: `${r.name} — payment due ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}`,
+          detail: `${fmtMoney(i.amount)} due ${fmtDay(i.due_date)}`,
+          clientId: r.id,
+        });
+      }
+    });
+  });
+
+  // Missing EOD reports for daily-activity roles (setter / triager / phone_setter)
+  const expected = lastWorkday();
+  const expectedYmd = ymd(expected);
+  const submittedByMember = new Set(
+    entries.filter(e => e.date === expectedYmd).map(e => e.memberId)
+  );
+  (team || []).forEach(m => {
+    const roles = Array.isArray(m.roles) ? m.roles : (m.role ? [m.role] : []);
+    if (!roles.some(role => DAILY_EOD_ROLES.includes(role))) return;
+    if (!submittedByMember.has(m.id)) {
+      notes.push({
+        id: `eod:${m.id}:${expectedYmd}`,
+        type: 'missing_eod',
+        severity: 'medium',
+        title: `${m.name} hasn't submitted an EOD report`,
+        detail: `Missing for ${expected.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+        memberId: m.id,
+      });
+    }
+  });
+
+  const order = { high: 0, medium: 1, low: 2 };
+  notes.sort((a, b) => (order[a.severity] - order[b.severity]));
+  return notes;
+}
+
 // ============ FILTERING (unchanged) ============
 
 function filterByDateRange(items, startDate, endDate, dateField = 'date') {
@@ -640,5 +978,7 @@ export {
   getWireTransfers, addWireTransfer, deleteWireTransfer,
   getStripePayments,
   matchStripeToClosers, findMismatches,
+  getClients, addClient, updateClient, deleteClient,
+  computeClientDerived, calculateClientDashboard, buildNotifications,
   filterByDateRange, getDateRange, calculateMetrics, entryRevenue,
 };
