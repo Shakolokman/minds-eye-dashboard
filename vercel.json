@@ -1,0 +1,5 @@
+{
+  "crons": [
+    { "path": "/api/week-left-email", "schedule": "0 5 * * *" }
+  ]
+}
