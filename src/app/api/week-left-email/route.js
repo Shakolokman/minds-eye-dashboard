@@ -259,18 +259,20 @@ export async function GET(request) {
 
   const { data, error } = await supabase
     .from('clients')
-    .select('name, email, coaching_end, last_session, revoke_date, notes, deal_size, installments, payment_emails')
+    .select('*')
     .eq('archived', false);
   if (error) {
     console.error('reminder email clients error:', error);
     return new Response(error.message, { status: 500 });
   }
 
+  // Refunded clients get no coaching-end or payment reminders.
+  const clients = (data || []).filter(c => !(parseFloat(c.refund_amount) > 0));
   const today = todayDubai();
   const result = {};
   try {
-    result.coaching = await coachingEmail(data || [], today, test);
-    result.payments = await paymentEmail(data || [], today, test);
+    result.coaching = await coachingEmail(clients, today, test);
+    result.payments = await paymentEmail(clients, today, test);
   } catch (err) {
     console.error('reminder email error:', err);
     return new Response(String(err.message || err), { status: 502 });
