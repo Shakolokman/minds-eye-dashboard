@@ -463,6 +463,9 @@ async function getClients() {
       revokeDate: row.revoke_date,
       notes: row.notes || '',
       paymentEmails: Array.isArray(row.payment_emails) ? row.payment_emails : [],
+      refundAmount: row.refund_amount ?? null,
+      refundDate: row.refund_date || null,
+      refundReason: row.refund_reason || '',
       archived: !!row.archived,
       timestamp: row.created_at,
     }));
@@ -493,18 +496,39 @@ function clientToRow(c) {
     revoke_date: c.revokeDate || null,
     notes: c.notes || null,
     payment_emails: (c.paymentEmails || []).filter(Boolean),
+    refund_amount: c.refundAmount === '' || c.refundAmount == null ? null : parseFloat(c.refundAmount),
+    refund_date: c.refundDate || null,
+    refund_reason: c.refundReason || null,
     archived: !!c.archived,
   };
+}
+
+const REFUND_COLS = ['refund_amount', 'refund_date', 'refund_reason'];
+
+// If the refund columns haven't been added in Supabase yet (migration 002),
+// save everything else instead of failing the whole save.
+function isMissingRefundColumn(error) {
+  const msg = `${error?.message || ''} ${error?.details || ''}`;
+  return REFUND_COLS.some(col => msg.includes(col));
+}
+function withoutRefund(row) {
+  const r = { ...row };
+  REFUND_COLS.forEach(col => delete r[col]);
+  return r;
 }
 
 async function addClient(client) {
   if (!supabase) return null;
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('clients')
       .insert(clientToRow(client))
       .select()
       .single();
+    if (error && isMissingRefundColumn(error)) {
+      console.warn('Refund columns missing — run migrations/002_client_refunds.sql');
+      ({ data, error } = await supabase.from('clients').insert(withoutRefund(clientToRow(client))).select().single());
+    }
     if (error) throw error;
     return data;
   } catch (err) {
@@ -516,12 +540,16 @@ async function addClient(client) {
 async function updateClient(id, patch) {
   if (!supabase) return null;
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('clients')
       .update(clientToRow(patch))
       .eq('id', id)
       .select()
       .single();
+    if (error && isMissingRefundColumn(error)) {
+      console.warn('Refund columns missing — run migrations/002_client_refunds.sql');
+      ({ data, error } = await supabase.from('clients').update(withoutRefund(clientToRow(patch))).eq('id', id).select().single());
+    }
     if (error) throw error;
     return data;
   } catch (err) {
@@ -601,21 +629,27 @@ function computeClientDerived(client, stripePayments = []) {
 
   const isPaid = (i) => i.paid || i.autoPaid;
   const totalPaid = insts.filter(isPaid).reduce((s, i) => s + i.amount, 0);
+  const refundAmount = parseFloat(client.refundAmount) || 0;
+  const refunded = refundAmount > 0;
+  const netPaid = totalPaid - refundAmount;
   const dealSize = client.dealSize == null || client.dealSize === '' ? null : parseFloat(client.dealSize);
   const outstanding = dealSize == null ? null : dealSize - totalPaid;
 
   const start = parseDate(client.coachingStart);
   const end = parseDate(client.coachingEnd);
   let status;
-  if (!start || !end) status = 'Not Started';
+  if (refunded) status = 'Refunded';
+  else if (!start || !end) status = 'Not Started';
   else if (today < start) status = 'Not Started';
   else if (today > end) status = 'Completed';
   else status = 'Active';
 
   const daysUntilEnd = end ? daysBetween(end, today) : null;
 
+  // A refunded client owes nothing more: no overdue / due-soon alerts.
   let paymentStatus;
-  if (outstanding != null && outstanding <= 0) paymentStatus = 'Paid';
+  if (refunded) paymentStatus = refundAmount + 0.5 >= totalPaid ? 'Refunded' : 'Part Refunded';
+  else if (outstanding != null && outstanding <= 0) paymentStatus = 'Paid';
   else {
     const anyOverdue = insts.some(i => {
       const due = parseDate(i.due_date);
@@ -628,7 +662,10 @@ function computeClientDerived(client, stripePayments = []) {
     ...client,
     installments: insts,
     totalPaid,
-    outstanding,
+    outstanding: refunded ? 0 : outstanding,
+    refunded,
+    refundAmount,
+    netPaid,
     status,
     daysUntilEnd,
     paymentStatus,
@@ -650,7 +687,15 @@ function calculateClientDashboard(clients, stripePayments = []) {
     .filter(r => r.paymentStatus === 'Overdue')
     .sort((a, b) => (b.outstanding || 0) - (a.outstanding || 0));
   const activeRevenue = active.reduce((s, r) => s + (r.dealSize || 0), 0);
+  // Refunds include finished (archived) clients too, newest refund first.
+  const refundList = clients
+    .map(c => computeClientDerived(c, stripePayments))
+    .filter(r => r.refunded)
+    .sort((a, b) => String(b.refundDate || '').localeCompare(String(a.refundDate || '')));
+  const refundTotal = refundList.reduce((s, r) => s + r.refundAmount, 0);
   return {
+    refundList,
+    refundTotal,
     rows,
     activeClients,
     endingIn14: endingList.length,
@@ -704,9 +749,11 @@ function buildNotifications(clients, entries = [], team = [], stripePayments = [
         clientId: r.id,
       });
     }
-    // Revoke Skool access — only around the revoke date (window avoids nagging on old clients)
-    if (r.revokeDate) {
-      const rev = parseDate(r.revokeDate);
+    // Revoke Skool access — only around the revoke date (window avoids nagging on old clients).
+    // A refunded client with no revoke date is reminded around the refund date.
+    const revokeOn = r.revokeDate || (r.refunded ? r.refundDate : null);
+    if (revokeOn) {
+      const rev = parseDate(revokeOn);
       const d = daysBetween(rev, today);
       if (d >= -3 && d <= 7) {
         notes.push({
@@ -714,14 +761,15 @@ function buildNotifications(clients, entries = [], team = [], stripePayments = [
           type: 'revoke_skool',
           severity: d <= 0 ? 'high' : 'medium',
           title: d < 0
-            ? `Revoke Skool access for ${r.name} (was due ${fmtDay(r.revokeDate)})`
+            ? `Revoke Skool access for ${r.name} (was due ${fmtDay(revokeOn)})`
             : `Revoke Skool access for ${r.name} ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}`,
-          detail: `Revoke date ${fmtDay(r.revokeDate)}`,
+          detail: r.revokeDate ? `Revoke date ${fmtDay(revokeOn)}` : `Refunded ${fmtDay(revokeOn)}`,
           clientId: r.id,
         });
       }
     }
-    // Payments — overdue, then upcoming this week
+    // Payments — overdue, then upcoming this week (none for refunded clients)
+    if (r.refunded) return;
     (r.installments || []).forEach((i, idx) => {
       const due = parseDate(i.due_date);
       const paid = i.paid || i.autoPaid;
