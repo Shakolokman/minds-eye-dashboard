@@ -11,11 +11,14 @@ const STATUS_STYLES = {
   Active: 'bg-emerald-900/30 text-emerald-400',
   Completed: 'bg-brand-slate/40 text-brand-muted',
   'Not Started': 'bg-blue-900/30 text-blue-400',
+  Refunded: 'bg-orange-900/30 text-orange-400',
 };
 const PAY_STYLES = {
   Paid: 'bg-emerald-900/30 text-emerald-400',
   'On Track': 'bg-brand-slate/40 text-brand-muted',
   Overdue: 'bg-red-900/30 text-red-400',
+  Refunded: 'bg-orange-900/30 text-orange-400',
+  'Part Refunded': 'bg-orange-900/30 text-orange-400',
 };
 
 const emptyInstallment = () => ({ amount: '', due_date: '', paid: false, manual: true });
@@ -24,6 +27,7 @@ const emptyForm = () => ({
   installments: [emptyInstallment()],
   coachingStart: '', coachingEnd: '', lastSession: '', revokeDate: '',
   notes: '', paymentEmailsText: '',
+  refundAmount: '', refundDate: '', refundReason: '',
 });
 
 function daysColor(d) {
@@ -59,7 +63,7 @@ export default function ClientsPage() {
   useEffect(() => { (async () => { await reload(); setMounted(true); })(); }, []);
 
   const dash = useMemo(() => calculateClientDashboard(clients, stripePayments), [clients, stripePayments]);
-  const activeRows = useMemo(() => [...dash.rows].sort(byNewest), [dash.rows]);
+  const activeRows = useMemo(() => dash.rows.filter(r => !r.refunded).sort(byNewest), [dash.rows]);
   const pastRows = useMemo(
     () => clients.filter(c => c.archived).map(c => computeClientDerived(c, stripePayments)).sort(byNewest),
     [clients, stripePayments]
@@ -79,6 +83,7 @@ export default function ClientsPage() {
       coachingStart: row.coachingStart || '', coachingEnd: row.coachingEnd || '',
       lastSession: row.lastSession || '', revokeDate: row.revokeDate || '',
       notes: row.notes || '', paymentEmailsText: (row.paymentEmails || []).join(', '),
+      refundAmount: row.refundAmount ? row.refundAmount : '', refundDate: row.refundDate || '', refundReason: row.refundReason || '',
     });
     setShowForm(true);
   };
@@ -100,6 +105,8 @@ export default function ClientsPage() {
       coachingStart: form.coachingStart || null, coachingEnd: form.coachingEnd || null,
       lastSession: form.lastSession || null, revokeDate: form.revokeDate || null,
       notes: form.notes.trim(), paymentEmails: form.paymentEmailsText.split(',').map(s => s.trim()).filter(Boolean),
+      refundAmount: form.refundAmount === '' ? null : form.refundAmount,
+      refundDate: form.refundDate || null, refundReason: form.refundReason.trim(),
       archived: editingId ? !!clients.find(c => c.id === editingId)?.archived : false,
     };
     if (editingId) await updateClient(editingId, payload); else await addClient(payload);
@@ -118,7 +125,9 @@ export default function ClientsPage() {
       name: row.name, email: row.email, onboardingDate: row.onboardingDate, source: row.source,
       dealSize: row.dealSize, installments: row.installments, coachingStart: row.coachingStart,
       coachingEnd: row.coachingEnd, lastSession: row.lastSession, revokeDate: row.revokeDate,
-      notes: row.notes, paymentEmails: row.paymentEmails, archived: !row.archived,
+      notes: row.notes, paymentEmails: row.paymentEmails,
+      refundAmount: row.refundAmount || null, refundDate: row.refundDate, refundReason: row.refundReason,
+      archived: !row.archived,
     });
     await reload();
   };
@@ -182,8 +191,8 @@ export default function ClientsPage() {
   if (!mounted) return <div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-2 border-brand-gold border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-display font-bold text-white">Clients</h1>
           <p className="text-sm text-brand-muted mt-0.5">Coaching clients, installments, and renewals</p>
@@ -201,12 +210,13 @@ export default function ClientsPage() {
       </div>
 
       {/* KPI tiles */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <StatCard label="Active Clients" value={dash.activeClients} icon="👥" highlight />
         <StatCard label="Ending in 14 Days" value={dash.endingIn14} icon="⏳" kpiColor={dash.endingIn14 > 0 ? 'orange' : undefined} />
         <StatCard label="Revoke This Week" value={dash.revokeThisWeek} icon="🚫" kpiColor={dash.revokeThisWeek > 0 ? 'red' : undefined} />
         <StatCard label="Overdue Payments" value={dash.overduePayments} icon="💸" kpiColor={dash.overduePayments > 0 ? 'red' : undefined} />
         <StatCard label="Active Revenue" value={fmtUSD(dash.activeRevenue)} icon="💰" highlight />
+        <StatCard label="Refunds" value={fmtUSD(dash.refundTotal)} icon="↩️" subtitle={`${dash.refundList.length} client${dash.refundList.length === 1 ? '' : 's'}`} />
       </div>
 
       {/* Alert lists */}
@@ -274,6 +284,55 @@ export default function ClientsPage() {
         </div>
       </div>
 
+      {/* Refunds */}
+      <div className="bg-brand-surface border border-brand-slate/30 rounded-xl overflow-hidden mb-6">
+        <div className="px-5 py-4 border-b border-brand-slate/20 flex flex-wrap items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-orange-400" />
+          <h3 className="text-sm font-semibold text-white">Refunds</h3>
+          <span className="text-xs text-brand-muted">({dash.refundList.length})</span>
+          <span className="text-xs text-orange-400 ml-auto">{fmtUSD(dash.refundTotal)} refunded</span>
+        </div>
+        {dash.refundList.length === 0 ? (
+          <p className="text-brand-muted text-sm py-8 px-4 text-center">No refunds. To log one, edit the client and fill in the Refund section.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-brand-muted text-xs uppercase tracking-wider border-b border-brand-slate/30 bg-brand-darker/50">
+                  <th className="text-left py-3 px-4">Client</th>
+                  <th className="text-left py-3 px-4">Refund Date</th>
+                  <th className="text-right py-3 px-4">Paid</th>
+                  <th className="text-right py-3 px-4">Refunded</th>
+                  <th className="text-right py-3 px-4">Kept</th>
+                  <th className="text-left py-3 px-4">Reason</th>
+                  <th className="text-right py-3 px-3 w-12"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {dash.refundList.map(r => (
+                  <tr key={r.id} className="border-b border-brand-slate/10 hover:bg-brand-slate/10 transition-colors">
+                    <td className="py-3 px-4">
+                      <p className="text-white text-sm">{r.name}</p>
+                      {r.email && <p className="text-xs text-brand-muted">{r.email}</p>}
+                    </td>
+                    <td className="py-3 px-4 text-xs text-white whitespace-nowrap">{fmtLong(r.refundDate)}</td>
+                    <td className="py-3 px-4 text-right text-white">{fmtUSD(r.totalPaid)}</td>
+                    <td className="py-3 px-4 text-right text-orange-400 font-medium">{fmtUSD(r.refundAmount)}</td>
+                    <td className="py-3 px-4 text-right text-brand-muted">{fmtUSD(Math.max(0, r.netPaid))}</td>
+                    <td className="py-3 px-4 text-xs text-brand-muted min-w-[160px]">{r.refundReason || '—'}</td>
+                    <td className="py-3 px-3 text-right">
+                      <button onClick={() => openEdit(r)} className="text-brand-muted hover:text-brand-gold transition-colors p-1.5 rounded-lg hover:bg-brand-gold/10" title="Edit">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Past clients */}
       {pastRows.length > 0 && (
         <div className="bg-brand-surface/60 border border-brand-slate/20 rounded-xl overflow-hidden">
@@ -328,7 +387,7 @@ export default function ClientsPage() {
                 </div>
                 <div className="space-y-2">
                   {form.installments.map((inst, idx) => (
-                    <div key={idx} className="flex items-center gap-2">
+                    <div key={idx} className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                       <span className="text-xs text-brand-muted w-5">{idx + 1}</span>
                       <input type="number" step="0.01" placeholder="Amount" className="input-field !py-2 flex-1" value={inst.amount} onChange={e => setInst(idx, { amount: e.target.value })} />
                       <input type="date" className="input-field !py-2 flex-1" value={inst.due_date} onChange={e => setInst(idx, { due_date: e.target.value })} />
@@ -355,6 +414,19 @@ export default function ClientsPage() {
                   <input type="date" className="input-field !py-2" value={form.lastSession} onChange={e => setForm(f => ({ ...f, lastSession: e.target.value }))} /></div>
                 <div><label className="text-xs text-brand-muted mb-1 block">Revoke Skool</label>
                   <input type="date" className="input-field !py-2" value={form.revokeDate} onChange={e => setForm(f => ({ ...f, revokeDate: e.target.value }))} /></div>
+              </div>
+
+              <div className="rounded-xl border border-orange-500/20 bg-orange-900/10 p-4">
+                <label className="text-xs text-orange-300 uppercase tracking-wider font-semibold block mb-2">Refund</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-xs text-brand-muted mb-1 block">Refund Amount ($)</label>
+                    <input type="number" step="0.01" min="0" className="input-field !py-2" value={form.refundAmount} onChange={e => setForm(f => ({ ...f, refundAmount: e.target.value }))} placeholder="0" /></div>
+                  <div><label className="text-xs text-brand-muted mb-1 block">Refund Date</label>
+                    <input type="date" className="input-field !py-2" value={form.refundDate} onChange={e => setForm(f => ({ ...f, refundDate: e.target.value }))} /></div>
+                </div>
+                <div className="mt-3"><label className="text-xs text-brand-muted mb-1 block">Reason</label>
+                  <input className="input-field !py-2" value={form.refundReason} onChange={e => setForm(f => ({ ...f, refundReason: e.target.value }))} placeholder="Optional" /></div>
+                <p className="text-[11px] text-brand-muted mt-2">Any refund amount moves the client to Refunds and stops payment reminders. If there is no Revoke Skool date, you get a reminder to revoke access around the refund date.</p>
               </div>
 
               <div><label className="text-xs text-brand-muted mb-1 block">Notes</label>
