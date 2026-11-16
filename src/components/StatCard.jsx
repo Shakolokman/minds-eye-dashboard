@@ -8,10 +8,10 @@ export default function StatCard({ label, value, subtitle, icon, highlight, kpiC
 
   return (
     <div className={`stat-card ${hasBg ? bgClass : (highlight ? 'border-brand-gold/40 gold-glow' : '')} ${className}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="stat-label">{label}</span>
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <span className="stat-label min-w-0 leading-snug">{label}</span>
         {icon && (
-          <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${hasBg ? 'bg-white/5' : (highlight ? 'bg-brand-gold/15 text-brand-gold' : 'bg-brand-slate/40 text-brand-muted')}`}>
+          <span className={`flex-shrink-0 w-7 h-7 md:w-8 md:h-8 rounded-lg flex items-center justify-center text-xs ${hasBg ? 'bg-white/5' : (highlight ? 'bg-brand-gold/15 text-brand-gold' : 'bg-brand-slate/40 text-brand-muted')}`}>
             {icon}
           </span>
         )}

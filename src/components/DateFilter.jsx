@@ -41,7 +41,7 @@ export default function DateFilter({ activePreset, onPresetChange, customStart, 
         Custom
       </button>
       {showCustom && (
-        <div className="flex items-center gap-2 animate-fade-in">
+        <div className="flex items-center gap-2 animate-fade-in w-full sm:w-auto">
           <input
             type="date"
             value={customStart}

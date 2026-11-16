@@ -15,19 +15,20 @@ export default function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-[72px] bg-brand-darker border-r border-brand-slate/20 flex flex-col items-center py-5 z-50">
-      <Link href="/" className="mb-8">
+    <aside className="fixed z-50 bg-brand-darker border-brand-slate/20 bottom-0 left-0 right-0 h-16 border-t flex flex-row items-center px-1 pb-[env(safe-area-inset-bottom)] md:pb-0 md:top-0 md:right-auto md:h-full md:w-[72px] md:border-t-0 md:border-r md:flex-col md:py-5 md:px-0">
+      <Link href="/" className="hidden md:block mb-8">
         <img src="/logo.png" alt="Mind's Eye" className="w-10 h-10 object-contain" />
       </Link>
 
-      <nav className="flex flex-col gap-2 flex-1">
+      <nav className="flex flex-row justify-around w-full md:w-auto md:flex-col md:justify-start gap-1 md:gap-2 flex-1">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative w-11 h-11 flex items-center justify-center rounded-xl transition-all duration-200 ${
+              aria-label={item.label}
+              className={`group relative w-12 h-12 md:w-11 md:h-11 flex items-center justify-center rounded-xl transition-all duration-200 ${
                 isActive
                   ? 'bg-brand-gold/15 text-brand-gold'
                   : 'text-brand-muted hover:text-brand-gold hover:bg-brand-surface'
@@ -36,8 +37,8 @@ export default function Sidebar() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
                 <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
               </svg>
-              {isActive && <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-brand-gold rounded-r-full" />}
-              <div className="absolute left-14 bg-brand-dark text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap border border-brand-slate/30 shadow-xl z-50">
+              {isActive && <div className="absolute top-0 left-1/2 -translate-x-1/2 h-[3px] w-5 rounded-b-full md:left-0 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 md:w-[3px] md:h-5 md:rounded-b-none md:rounded-r-full bg-brand-gold" />}
+              <div className="hidden md:block absolute left-14 bg-brand-dark text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap border border-brand-slate/30 shadow-xl z-50">
                 {item.label}
               </div>
             </Link>

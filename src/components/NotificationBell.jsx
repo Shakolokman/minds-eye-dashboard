@@ -85,10 +85,10 @@ export default function NotificationBell() {
   };
 
   return (
-    <div ref={panelRef} className="fixed bottom-4 left-4 z-[60]">
+    <div ref={panelRef} className="fixed bottom-20 right-4 md:bottom-4 md:left-4 md:right-auto z-[60]">
       <button
         onClick={() => setOpen(o => !o)}
-        className={`relative w-11 h-11 flex items-center justify-center rounded-xl transition-all ${open ? 'bg-brand-gold/15 text-brand-gold' : 'text-brand-muted hover:text-brand-gold hover:bg-brand-surface'}`}
+        className={`relative w-12 h-12 md:w-11 md:h-11 flex items-center justify-center rounded-full md:rounded-xl shadow-lg md:shadow-none border border-brand-slate/40 md:border-0 transition-all ${open ? 'bg-brand-gold/15 text-brand-gold' : 'bg-brand-darker md:bg-transparent text-brand-muted hover:text-brand-gold hover:bg-brand-surface'}`}
         title="Notifications"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={1.8}>
@@ -102,7 +102,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute left-full bottom-0 ml-3 w-[360px] max-h-[75vh] overflow-y-auto bg-brand-darker border border-brand-slate/40 rounded-xl shadow-2xl animate-fade-in">
+        <div className="fixed left-3 right-3 bottom-36 max-h-[65vh] md:absolute md:left-full md:right-auto md:bottom-0 md:ml-3 md:w-[360px] md:max-h-[75vh] overflow-y-auto bg-brand-darker border border-brand-slate/40 rounded-xl shadow-2xl animate-fade-in">
           <div className="px-4 py-3 border-b border-brand-slate/30 flex items-center justify-between sticky top-0 bg-brand-darker z-10">
             <h3 className="text-sm font-semibold text-white">Notifications</h3>
             <div className="flex items-center gap-3">
