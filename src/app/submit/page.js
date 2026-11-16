@@ -133,7 +133,7 @@ export default function SubmitPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 max-w-2xl mx-auto">
       <h1 className="text-2xl font-display font-bold text-white mb-1">Submit Report</h1>
       <p className="text-sm text-brand-muted mb-6">Select your name to see your form.</p>
 

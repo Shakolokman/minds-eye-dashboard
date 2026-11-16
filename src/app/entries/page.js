@@ -225,10 +225,10 @@ export default function EntriesPage() {
   const selectedMember = selectedEntry ? team.find(m => m.id === selectedEntry.memberId) : null;
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
       {selectedEntry && <ReportModal entry={selectedEntry} member={selectedMember} onClose={() => setSelectedEntry(null)} />}
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-display font-bold text-white">All Entries</h1>
           <p className="text-sm text-brand-muted mt-0.5">{filtered.length} entries</p>

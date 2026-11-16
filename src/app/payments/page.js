@@ -202,8 +202,8 @@ export default function PaymentsPage() {
   if (!mounted) return <div className="flex items-center justify-center min-h-screen"><div className="w-8 h-8 border-2 border-brand-gold border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-display font-bold text-white">Payments</h1>
           <p className="text-sm text-brand-muted mt-0.5">Track revenue, Stripe payments, and wire transfers</p>
