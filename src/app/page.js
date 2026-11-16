@@ -218,9 +218,9 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="p-6 max-w-[1600px] mx-auto">
+    <div className="p-4 md:p-6 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-2xl font-display font-bold text-white">Dashboard</h1>
           <p className="text-sm text-brand-muted mt-0.5">Mind&apos;s Eye Status — Sales Performance</p>
@@ -327,7 +327,7 @@ export default function Dashboard() {
                 const deposit = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('deposit')).length;
                 const isRemoved = !team.find(t => t.id === member.id);
                 return (
-                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-4 md:p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
                       <div>
@@ -339,13 +339,13 @@ export default function Dashboard() {
                         <p className="text-xs text-brand-muted">revenue</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-4 gap-2 mb-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">On Cal</p><p className="text-lg font-bold text-white">{onCal}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Held</p><p className="text-lg font-bold text-white">{live}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">No Shows</p><p className="text-lg font-bold text-red-400">{noShows}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Show %</p><p className="text-lg font-bold text-white">{fmtPct(showRate)}</p></div>
                     </div>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Closed</p><p className="text-lg font-bold text-brand-gold">{closedCount}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Close %</p><p className="text-lg font-bold text-brand-gold">{fmtPct(closeRate)}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center">
@@ -460,7 +460,7 @@ export default function Dashboard() {
                 const bookedSC = memberEntries.filter(e => e.showUp === 'live' && e.bookedForSC === 'yes').length;
                 const isRemoved = !team.find(t => t.id === member.id);
                 return (
-                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-4 md:p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
                       <div>
@@ -538,7 +538,7 @@ export default function Dashboard() {
                 const daysWorked = memberEntries.length;
                 const isRemoved = !team.find(t => t.id === member.id);
                 return (
-                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-4 md:p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
                       <div>
@@ -550,19 +550,19 @@ export default function Dashboard() {
                         <p className="text-xs text-brand-muted">calls booked</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-4 gap-2 mb-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Dials</p><p className="text-lg font-bold text-white">{dials}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">No Ans</p><p className="text-lg font-bold text-red-400">{noAns}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Qual</p><p className="text-lg font-bold text-white">{qual}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Connect %</p><p className="text-lg font-bold text-white">{fmtPct(connectRate)}</p></div>
                     </div>
-                    <div className="grid grid-cols-4 gap-2 mb-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC (Wksp)</p><p className="text-lg font-bold text-brand-gold">{tcW}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">TC (Pipe)</p><p className="text-lg font-bold text-brand-gold">{tcP}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC (Wksp)</p><p className="text-lg font-bold text-brand-gold">{scW}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">SC (Other)</p><p className="text-lg font-bold text-brand-gold">{scO}</p></div>
                     </div>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">Book %</p><p className="text-lg font-bold text-white">{fmtPct(bookingRate)}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FUs</p><p className="text-lg font-bold text-white">{fuCalled}</p></div>
                       <div className="bg-brand-darker rounded-lg p-2.5 text-center"><p className="text-xs text-brand-muted font-semibold">FU Bkd</p><p className="text-lg font-bold text-brand-gold">{fuBookings}</p></div>
@@ -667,7 +667,7 @@ export default function Dashboard() {
                 const daysWorked = memberEntries.length;
                 const isRemoved = !team.find(t => t.id === member.id);
                 return (
-                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
+                  <div key={member.id} className={`bg-brand-surface border rounded-xl p-4 md:p-5 ${isRemoved ? 'border-brand-slate/20 opacity-70' : 'border-brand-slate/30'}`}>
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-brand-darkest" style={{ backgroundColor: member.color }}>{member.name[0]}</div>
                       <div>
