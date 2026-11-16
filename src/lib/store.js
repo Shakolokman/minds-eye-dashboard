@@ -588,8 +588,13 @@ function daysBetween(a, b) {
   return Math.round((a - b) / 86400000);
 }
 
+// Payments made more than this many days before onboarding belong to an
+// earlier program (e.g. a returning client) and are not counted toward this deal.
+const PRE_ONBOARDING_GRACE_DAYS = 7;
+
 // Total of succeeded Stripe/FanBasis payments whose customer email matches this
-// client (primary email or any of the extra paymentEmails).
+// client (primary email or any of the extra paymentEmails), counting only
+// payments from shortly before onboarding onward.
 function matchedPaymentTotal(client, stripePayments) {
   const emails = new Set(
     [client.email, ...(client.paymentEmails || [])]
@@ -597,8 +602,11 @@ function matchedPaymentTotal(client, stripePayments) {
       .filter(Boolean)
   );
   if (!emails.size) return 0;
+  const onboard = parseDate(client.onboardingDate);
+  const cutoff = onboard ? new Date(onboard.getTime() - PRE_ONBOARDING_GRACE_DAYS * 86400000) : null;
   return stripePayments
     .filter(p => p.status === 'succeeded' && emails.has((p.customerEmail || '').toLowerCase().trim()))
+    .filter(p => { const d = parseDate(p.date); return !cutoff || !d || d >= cutoff; })
     .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
 }
 
