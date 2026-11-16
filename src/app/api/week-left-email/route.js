@@ -134,9 +134,14 @@ function resolveInstallments(client, payments) {
       .map(e => (e || '').toLowerCase().trim())
       .filter(Boolean)
   );
+  // Same rule as the dashboard: ignore payments from more than 7 days before
+  // onboarding (they belong to an earlier program).
+  const onboard = parseDate(client.onboarding_date);
+  const cutoff = onboard ? new Date(onboard.getTime() - 7 * 86400000) : null;
   const matchedTotal = emails.size
     ? payments
         .filter(p => p.status === 'succeeded' && emails.has((p.customer_email || '').toLowerCase().trim()))
+        .filter(p => { const d = parseDate((p.created_at || '').split('T')[0]); return !cutoff || !d || d >= cutoff; })
         .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0)
     : 0;
 
@@ -191,7 +196,7 @@ function paymentCard(p) {
 async function paymentEmail(clients, today, test) {
   const { data: payments, error } = await supabase
     .from('stripe_payments')
-    .select('customer_email, amount, status');
+    .select('customer_email, amount, status, created_at');
   if (error) throw new Error(`stripe_payments: ${error.message}`);
 
   const all = [];
