@@ -157,7 +157,7 @@ export default function ClientsPage() {
         <span className="text-xs text-white">{fmtShort(r.coachingStart)}</span>
         <span className="text-brand-muted text-xs mx-1">→</span>
         <span className="text-xs text-white">{fmtShort(r.coachingEnd)}</span>
-        {r.firstPaymentDate && r.coachingStart && r.firstPaymentDate !== r.coachingStart && (
+        {!past && r.firstPaymentDate && r.coachingStart && r.firstPaymentDate !== r.coachingStart && (
           <span className="block text-[10px] text-amber-400 mt-0.5" title="Coaching start should match the first payment date. Edit the client and click “Use payment date”.">
             ⚠ paid {fmtShort(r.firstPaymentDate)}
           </span>
