@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie } from 'recharts';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, getStripePayments, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, entryRevenue, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, getStripePayments, getClients, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, entryRevenue, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
 
 const fmt = (n) => typeof n === 'number' ? (n >= 1000 ? `${(n/1000).toFixed(1)}k` : n % 1 === 0 ? n.toString() : n.toFixed(1)) : '0';
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -20,6 +20,7 @@ export default function Dashboard() {
   const [allEntries, setAllEntries] = useState([]);
   const [wireTransfers, setWireTransfers] = useState([]);
   const [stripePayments, setStripePayments] = useState([]);
+  const [clientRefunds, setClientRefunds] = useState([]);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -28,13 +29,19 @@ export default function Dashboard() {
       setAllEntries(await getEntries());
       setWireTransfers(await getWireTransfers());
       setStripePayments(await getStripePayments());
+      // Refunds logged on the Clients page are the source of truth (they cover
+      // FanBasis, Stripe and wire refunds alike), dated by their refund date.
+      const clients = await getClients();
+      setClientRefunds(clients
+        .filter(c => (parseFloat(c.refundAmount) || 0) > 0)
+        .map(c => ({ name: c.name, amount: parseFloat(c.refundAmount) || 0, date: c.refundDate })));
       setMounted(true);
     }
     loadData();
   }, []);
 
-  const { filteredEntries, filteredWires, filteredStripe } = useMemo(() => {
-    if (!mounted) return { filteredEntries: [], filteredWires: [], filteredStripe: [] };
+  const { filteredEntries, filteredWires, filteredStripe, filteredRefunds } = useMemo(() => {
+    if (!mounted) return { filteredEntries: [], filteredWires: [], filteredStripe: [], filteredRefunds: [] };
     let start, end;
     if (preset === 'custom' && customStart && customEnd) {
       start = new Date(customStart + 'T00:00:00');
@@ -48,10 +55,18 @@ export default function Dashboard() {
       filteredEntries: filterByDateRange(allEntries, start, end),
       filteredWires: filterByDateRange(wireTransfers, start, end),
       filteredStripe: filterByDateRange(stripePayments, start, end),
+      // Refund dates are plain YYYY-MM-DD; parse as local midnight like the presets.
+      filteredRefunds: clientRefunds.filter(r => {
+        if (!r.date) return false;
+        const d = new Date(r.date + 'T00:00:00');
+        return d >= start && d <= end;
+      }),
     };
-  }, [mounted, preset, customStart, customEnd, allEntries, wireTransfers, stripePayments]);
+  }, [mounted, preset, customStart, customEnd, allEntries, wireTransfers, stripePayments, clientRefunds]);
 
   const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires, filteredStripe), [filteredEntries, filteredWires, filteredStripe]);
+  const refundTotal = filteredRefunds.reduce((s, r) => s + r.amount, 0);
+  const netCash = metrics.allCashTotal - refundTotal;
 
   // Calculate KPI targets scaled to the selected date range
   // Daily targets (weekly ÷ 5 work days)
@@ -281,6 +296,8 @@ export default function Dashboard() {
         <StatCard label="PIF Deals" value={metrics.pifDeals} icon="✅" />
         <StatCard label="Split Pay" value={metrics.splitDeals} icon="📋" />
         <StatCard label="Deposit Close" value={metrics.depositDeals} icon="📝" />
+        <StatCard label="Refunds" value={fmtUSD(refundTotal)} icon="↩️" subtitle={filteredRefunds.length > 0 ? `${filteredRefunds.length} client${filteredRefunds.length === 1 ? '' : 's'} · ${filteredRefunds.map(r => r.name.split(' ')[0]).join(', ')}` : 'From the Clients page'} />
+        <StatCard label="Net Cash" value={fmtUSD(netCash)} highlight icon="💵" subtitle="Cash collected minus refunds" />
       </div>
 
       {/* ===== 2. CLOSER PERFORMANCE ===== */}
