@@ -59,9 +59,14 @@ export async function POST(request) {
   try {
     if (eventType === 'payment.succeeded' || eventType === 'payment.completed') {
       await savePayment(mapPayment(d, eventType, 'succeeded'));
-    } else if (eventType === 'payment.refunded' || eventType === 'refund.succeeded') {
+    } else if (eventType === 'refund.created' || eventType === 'payment.refunded' || eventType === 'refund.succeeded') {
+      // FanBasis sends `refund.created` (the only refund event it offers).
+      // Refund amounts are in dollars, same as FanBasis transactions.
       const row = mapPayment(d, eventType, 'refunded');
-      row.stripe_payment_id = `fb_refund_${paymentId(d)}`;
+      const refund = d.refund || {};
+      const refundAmount = refund.amount ?? d.refund_amount ?? d.amount_refunded ?? d.total_price ?? d.amount;
+      if (refundAmount != null) row.amount = parseFloat(refundAmount) || 0;
+      row.stripe_payment_id = `fb_refund_${refund.payment_id || paymentId(d)}`;
       row.amount = -Math.abs(row.amount);
       row.payment_type = 'refund';
       await savePayment(row);
