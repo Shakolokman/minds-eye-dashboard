@@ -613,17 +613,21 @@ function matchedPaymentTotal(client, stripePayments) {
   return matchedPayments(client, stripePayments).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
 }
 
-// Local calendar day (YYYY-MM-DD) a payment was made, from its timestamp.
-function localDay(p) {
-  const t = p.timestamp ? new Date(p.timestamp) : parseDate(p.date);
-  if (!t || isNaN(t)) return null;
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
-}
+// A payment more than this many days before the coaching start belongs to an
+// earlier coaching period (e.g. the original program of a renewing client).
+const START_PAYMENT_WINDOW_DAYS = 45;
 
-// Date of the client's first matched Stripe/FanBasis payment for this deal —
-// coaching should start on this day.
+// Date of the first matched Stripe/FanBasis payment for the current coaching
+// period — coaching should start on this day. Uses the same payment date the
+// Payments page shows, so it doesn't change with the viewer's time zone.
 function firstPaymentDate(client, stripePayments) {
-  const days = matchedPayments(client, stripePayments).map(localDay).filter(Boolean).sort();
+  const start = parseDate(client.coachingStart);
+  const from = start ? new Date(start.getTime() - START_PAYMENT_WINDOW_DAYS * 86400000) : null;
+  const days = matchedPayments(client, stripePayments)
+    .map(p => p.date)
+    .filter(Boolean)
+    .filter(d => !from || parseDate(d) >= from)
+    .sort();
   return days[0] || null;
 }
 
