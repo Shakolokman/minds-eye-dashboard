@@ -595,19 +595,45 @@ const PRE_ONBOARDING_GRACE_DAYS = 7;
 // Total of succeeded Stripe/FanBasis payments whose customer email matches this
 // client (primary email or any of the extra paymentEmails), counting only
 // payments from shortly before onboarding onward.
-function matchedPaymentTotal(client, stripePayments) {
+function matchedPayments(client, stripePayments) {
   const emails = new Set(
     [client.email, ...(client.paymentEmails || [])]
       .map(e => (e || '').toLowerCase().trim())
       .filter(Boolean)
   );
-  if (!emails.size) return 0;
+  if (!emails.size) return [];
   const onboard = parseDate(client.onboardingDate);
   const cutoff = onboard ? new Date(onboard.getTime() - PRE_ONBOARDING_GRACE_DAYS * 86400000) : null;
   return stripePayments
     .filter(p => p.status === 'succeeded' && emails.has((p.customerEmail || '').toLowerCase().trim()))
-    .filter(p => { const d = parseDate(p.date); return !cutoff || !d || d >= cutoff; })
-    .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+    .filter(p => { const d = parseDate(p.date); return !cutoff || !d || d >= cutoff; });
+}
+
+function matchedPaymentTotal(client, stripePayments) {
+  return matchedPayments(client, stripePayments).reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
+}
+
+// Local calendar day (YYYY-MM-DD) a payment was made, from its timestamp.
+function localDay(p) {
+  const t = p.timestamp ? new Date(p.timestamp) : parseDate(p.date);
+  if (!t || isNaN(t)) return null;
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+}
+
+// Date of the client's first matched Stripe/FanBasis payment for this deal —
+// coaching should start on this day.
+function firstPaymentDate(client, stripePayments) {
+  const days = matchedPayments(client, stripePayments).map(localDay).filter(Boolean).sort();
+  return days[0] || null;
+}
+
+// Move a YYYY-MM-DD date by the gap between two other YYYY-MM-DD dates
+// (used to shift coaching end/revoke along with a corrected start).
+function shiftDay(day, fromDay, toDay) {
+  const d = parseDate(day), a = parseDate(fromDay), b = parseDate(toDay);
+  if (!d || !a || !b) return day;
+  const n = new Date(d.getFullYear(), d.getMonth(), d.getDate() + daysBetween(b, a));
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
 }
 
 // Resolve each installment's paid state by combining manual ticks with
@@ -678,6 +704,7 @@ function computeClientDerived(client, stripePayments = []) {
     daysUntilEnd,
     paymentStatus,
     matchedTotal,
+    firstPaymentDate: firstPaymentDate(client, stripePayments),
     hasAutoMatch: insts.some(i => i.autoPaid),
   };
 }
@@ -899,6 +926,43 @@ function entryRevenue(e, stripePayments = []) {
   return cash > 0 ? cash : 0;
 }
 
+// Processor fee kept on one payment. FanBasis keeps 2.9% + $0.97 (gross minus
+// their net_amount matches this on every transaction); Stripe's standard is
+// 2.9% + $0.30. Refund rows (negative amounts) carry no fee here.
+function processorFee(p) {
+  const amt = parseFloat(p.amount) || 0;
+  if (amt <= 0) return 0;
+  return p.processor === 'fanbasis' ? amt * 0.029 + 0.97 : amt * 0.029 + 0.30;
+}
+
+// Net cash for a date range, shared by the Dashboard and Clients tabs.
+// cashCollected: all cash in range (closer cash + wires + succeeded payments).
+// stripeInRange: Stripe/FanBasis rows in range. refundsInRange: client refunds
+// ({ amount }) dated in range — the Clients page is the source of truth.
+function calculateNetCash(cashCollected, stripeInRange = [], refundsInRange = []) {
+  const refundTotal = refundsInRange.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  const processorFees = stripeInRange
+    .filter(p => p.status === 'succeeded')
+    .reduce((s, p) => s + processorFee(p), 0);
+  const netCash = cashCollected - refundTotal;
+  return { refundTotal, processorFees, netCash, netCashAfterFees: netCash - processorFees };
+}
+
+// Client refunds as { name, amount, date } rows (date = refund date).
+function clientRefundRows(clients) {
+  return clients
+    .filter(c => (parseFloat(c.refundAmount) || 0) > 0)
+    .map(c => ({ name: c.name, amount: parseFloat(c.refundAmount) || 0, date: c.refundDate }));
+}
+
+// Keep rows whose plain YYYY-MM-DD date falls in [start, end] (local time).
+function filterByLocalDay(rows, start, end) {
+  return rows.filter(r => {
+    const d = parseDate(r.date);
+    return d && d >= start && d <= end;
+  });
+}
+
 function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const setterEntries = entries.filter(e => e.formType === 'setter');
   const outboundEntries = entries.filter(e => e.formType === 'outbound');
@@ -1037,4 +1101,6 @@ export {
   getClients, addClient, updateClient, deleteClient,
   computeClientDerived, calculateClientDashboard, buildNotifications,
   filterByDateRange, getDateRange, calculateMetrics, entryRevenue,
+  processorFee, calculateNetCash, clientRefundRows, filterByLocalDay,
+  firstPaymentDate, shiftDay,
 };
