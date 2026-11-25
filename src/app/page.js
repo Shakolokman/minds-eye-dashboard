@@ -67,6 +67,18 @@ export default function Dashboard() {
   const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires, filteredStripe), [filteredEntries, filteredWires, filteredStripe]);
   const refundTotal = filteredRefunds.reduce((s, r) => s + r.amount, 0);
   const netCash = metrics.allCashTotal - refundTotal;
+  // Processor fees. FanBasis keeps 2.9% + $0.97 per payment (gross minus their
+  // net_amount matches this on every transaction); Stripe's standard is 2.9% + $0.30.
+  // Wires and closer-entered cash carry no processor fee.
+  const processorFees = filteredStripe
+    .filter(p => p.status === 'succeeded')
+    .reduce((s, p) => {
+      const amt = parseFloat(p.amount) || 0;
+      if (amt <= 0) return s;
+      const fee = p.processor === 'fanbasis' ? amt * 0.029 + 0.97 : amt * 0.029 + 0.30;
+      return s + fee;
+    }, 0);
+  const netCashAfterFees = netCash - processorFees;
 
   // Calculate KPI targets scaled to the selected date range
   // Daily targets (weekly ÷ 5 work days)
@@ -297,7 +309,8 @@ export default function Dashboard() {
         <StatCard label="Split Pay" value={metrics.splitDeals} icon="📋" />
         <StatCard label="Deposit Close" value={metrics.depositDeals} icon="📝" />
         <StatCard label="Refunds" value={fmtUSD(refundTotal)} icon="↩️" subtitle={filteredRefunds.length > 0 ? `${filteredRefunds.length} client${filteredRefunds.length === 1 ? '' : 's'} · ${filteredRefunds.map(r => r.name.split(' ')[0]).join(', ')}` : 'From the Clients page'} />
-        <StatCard label="Net Cash" value={fmtUSD(netCash)} highlight icon="💵" subtitle="Cash collected minus refunds" />
+        <StatCard label="Net Cash (Before Fees)" value={fmtUSD(netCash)} icon="💵" subtitle="Cash collected minus refunds" />
+        <StatCard label="Net Cash (After Fees)" value={fmtUSD(netCashAfterFees)} highlight icon="🏦" subtitle={`After ${fmtUSD(processorFees)} FanBasis/Stripe fees`} />
       </div>
 
       {/* ===== 2. CLOSER PERFORMANCE ===== */}
