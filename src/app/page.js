@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie } from 'recharts';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, getStripePayments, getClients, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, entryRevenue, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, getStripePayments, getClients, clientRefundRows, filterByLocalDay, calculateNetCash, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, entryRevenue, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
 
 const fmt = (n) => typeof n === 'number' ? (n >= 1000 ? `${(n/1000).toFixed(1)}k` : n % 1 === 0 ? n.toString() : n.toFixed(1)) : '0';
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -31,10 +31,7 @@ export default function Dashboard() {
       setStripePayments(await getStripePayments());
       // Refunds logged on the Clients page are the source of truth (they cover
       // FanBasis, Stripe and wire refunds alike), dated by their refund date.
-      const clients = await getClients();
-      setClientRefunds(clients
-        .filter(c => (parseFloat(c.refundAmount) || 0) > 0)
-        .map(c => ({ name: c.name, amount: parseFloat(c.refundAmount) || 0, date: c.refundDate })));
+      setClientRefunds(clientRefundRows(await getClients()));
       setMounted(true);
     }
     loadData();
@@ -55,30 +52,13 @@ export default function Dashboard() {
       filteredEntries: filterByDateRange(allEntries, start, end),
       filteredWires: filterByDateRange(wireTransfers, start, end),
       filteredStripe: filterByDateRange(stripePayments, start, end),
-      // Refund dates are plain YYYY-MM-DD; parse as local midnight like the presets.
-      filteredRefunds: clientRefunds.filter(r => {
-        if (!r.date) return false;
-        const d = new Date(r.date + 'T00:00:00');
-        return d >= start && d <= end;
-      }),
+      filteredRefunds: filterByLocalDay(clientRefunds, start, end),
     };
   }, [mounted, preset, customStart, customEnd, allEntries, wireTransfers, stripePayments, clientRefunds]);
 
   const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires, filteredStripe), [filteredEntries, filteredWires, filteredStripe]);
-  const refundTotal = filteredRefunds.reduce((s, r) => s + r.amount, 0);
-  const netCash = metrics.allCashTotal - refundTotal;
-  // Processor fees. FanBasis keeps 2.9% + $0.97 per payment (gross minus their
-  // net_amount matches this on every transaction); Stripe's standard is 2.9% + $0.30.
-  // Wires and closer-entered cash carry no processor fee.
-  const processorFees = filteredStripe
-    .filter(p => p.status === 'succeeded')
-    .reduce((s, p) => {
-      const amt = parseFloat(p.amount) || 0;
-      if (amt <= 0) return s;
-      const fee = p.processor === 'fanbasis' ? amt * 0.029 + 0.97 : amt * 0.029 + 0.30;
-      return s + fee;
-    }, 0);
-  const netCashAfterFees = netCash - processorFees;
+  const { refundTotal, processorFees, netCash, netCashAfterFees } =
+    calculateNetCash(metrics.allCashTotal, filteredStripe, filteredRefunds);
 
   // Calculate KPI targets scaled to the selected date range
   // Daily targets (weekly ÷ 5 work days)
