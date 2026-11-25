@@ -132,7 +132,8 @@ export default function PaymentsPage() {
     ...filteredStripe.map(p => {
       const match = stripeCloserMatch.get(p.stripePaymentId || p.id);
       const amount = parseFloat(p.amount) || 0;
-      const isLowTicket = amount < 100;
+      // Refunds are stored as negative amounts — they are not workshop/low-ticket sales.
+      const isLowTicket = amount >= 0 && amount < 100;
       return {
         type: 'stripe_auto',
         date: p.date,
