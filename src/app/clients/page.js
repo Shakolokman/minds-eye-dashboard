@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useMemo } from 'react';
 import StatCard from '@/components/StatCard';
-import { getClients, getStripePayments, getTeam, addClient, updateClient, deleteClient, computeClientDerived, calculateClientDashboard } from '@/lib/store';
+import { getClients, getStripePayments, getTeam, getEntries, getWireTransfers, addClient, updateClient, deleteClient, computeClientDerived, calculateClientDashboard, getDateRange, filterByDateRange, filterByLocalDay, calculateMetrics, calculateNetCash, clientRefundRows, shiftDay } from '@/lib/store';
 
 const fmtUSD = (n) => n == null ? '—' : `$${Math.round(n).toLocaleString('en-US')}`;
 const fmtShort = (s) => { if (!s) return '—'; const [y, m, d] = String(s).split('T')[0].split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
@@ -50,6 +50,8 @@ export default function ClientsPage() {
   const [clients, setClients] = useState([]);
   const [stripePayments, setStripePayments] = useState([]);
   const [team, setTeam] = useState([]);
+  const [entries, setEntries] = useState([]);
+  const [wires, setWires] = useState([]);
   const [mounted, setMounted] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -57,12 +59,20 @@ export default function ClientsPage() {
   const [form, setForm] = useState(emptyForm());
 
   async function reload() {
-    const [c, s, t] = await Promise.all([getClients(), getStripePayments(), getTeam()]);
-    setClients(c); setStripePayments(s); setTeam(t);
+    const [c, s, t, e, w] = await Promise.all([getClients(), getStripePayments(), getTeam(), getEntries(), getWireTransfers()]);
+    setClients(c); setStripePayments(s); setTeam(t); setEntries(e); setWires(w);
   }
   useEffect(() => { (async () => { await reload(); setMounted(true); })(); }, []);
 
   const dash = useMemo(() => calculateClientDashboard(clients, stripePayments), [clients, stripePayments]);
+
+  // This month's net cash — same numbers as the Dashboard's "This Month" view.
+  const monthCash = useMemo(() => {
+    const { start, end } = getDateRange('month');
+    const stripeInRange = filterByDateRange(stripePayments, start, end);
+    const metrics = calculateMetrics(filterByDateRange(entries, start, end), filterByDateRange(wires, start, end), stripeInRange);
+    return calculateNetCash(metrics.allCashTotal, stripeInRange, filterByLocalDay(clientRefundRows(clients), start, end));
+  }, [clients, stripePayments, entries, wires]);
   const activeRows = useMemo(() => dash.rows.filter(r => !r.refunded).sort(byNewest), [dash.rows]);
   const pastRows = useMemo(
     () => clients.filter(c => c.archived).map(c => computeClientDerived(c, stripePayments)).sort(byNewest),
@@ -84,6 +94,7 @@ export default function ClientsPage() {
       lastSession: row.lastSession || '', revokeDate: row.revokeDate || '',
       notes: row.notes || '', paymentEmailsText: (row.paymentEmails || []).join(', '),
       refundAmount: row.refundAmount ? row.refundAmount : '', refundDate: row.refundDate || '', refundReason: row.refundReason || '',
+      firstPaymentDate: row.firstPaymentDate || '',
     });
     setShowForm(true);
   };
@@ -146,6 +157,11 @@ export default function ClientsPage() {
         <span className="text-xs text-white">{fmtShort(r.coachingStart)}</span>
         <span className="text-brand-muted text-xs mx-1">→</span>
         <span className="text-xs text-white">{fmtShort(r.coachingEnd)}</span>
+        {r.firstPaymentDate && r.coachingStart && r.firstPaymentDate !== r.coachingStart && (
+          <span className="block text-[10px] text-amber-400 mt-0.5" title="Coaching start should match the first payment date. Edit the client and click “Use payment date”.">
+            ⚠ paid {fmtShort(r.firstPaymentDate)}
+          </span>
+        )}
       </td>
       <td className={`py-3 px-4 text-right font-medium ${daysColor(r.daysUntilEnd)}`}>{r.daysUntilEnd == null ? '—' : `${r.daysUntilEnd}d`}</td>
       <td className="py-3 px-4 text-right text-white">{fmtUSD(r.dealSize)}</td>
@@ -210,13 +226,15 @@ export default function ClientsPage() {
       </div>
 
       {/* KPI tiles */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <StatCard label="Active Clients" value={dash.activeClients} icon="👥" highlight />
         <StatCard label="Ending in 14 Days" value={dash.endingIn14} icon="⏳" kpiColor={dash.endingIn14 > 0 ? 'orange' : undefined} />
         <StatCard label="Revoke This Week" value={dash.revokeThisWeek} icon="🚫" kpiColor={dash.revokeThisWeek > 0 ? 'red' : undefined} />
         <StatCard label="Overdue Payments" value={dash.overduePayments} icon="💸" kpiColor={dash.overduePayments > 0 ? 'red' : undefined} />
         <StatCard label="Active Revenue" value={fmtUSD(dash.activeRevenue)} icon="💰" highlight />
         <StatCard label="Refunds" value={fmtUSD(dash.refundTotal)} icon="↩️" subtitle={`${dash.refundList.length} client${dash.refundList.length === 1 ? '' : 's'}`} />
+        <StatCard label="Net Cash This Month (Before Fees)" value={fmtUSD(monthCash.netCash)} icon="💵" subtitle={`Cash collected minus ${fmtUSD(monthCash.refundTotal)} refunds`} />
+        <StatCard label="Net Cash This Month (After Fees)" value={fmtUSD(monthCash.netCashAfterFees)} highlight icon="🏦" subtitle={`After ${fmtUSD(monthCash.processorFees)} FanBasis/Stripe fees`} />
       </div>
 
       {/* Alert lists */}
@@ -407,7 +425,19 @@ export default function ClientsPage() {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div><label className="text-xs text-brand-muted mb-1 block">Coaching Start</label>
-                  <input type="date" className="input-field !py-2" value={form.coachingStart} onChange={e => setForm(f => ({ ...f, coachingStart: e.target.value }))} /></div>
+                  <input type="date" className="input-field !py-2" value={form.coachingStart} onChange={e => setForm(f => ({ ...f, coachingStart: e.target.value }))} />
+                  {form.firstPaymentDate && form.firstPaymentDate !== form.coachingStart && (
+                    <button type="button" className="text-[11px] text-amber-400 hover:text-brand-gold mt-1 text-left"
+                      title="Sets the start to the first payment date and moves the end and revoke dates by the same number of days"
+                      onClick={() => setForm(f => ({
+                        ...f,
+                        coachingStart: f.firstPaymentDate,
+                        coachingEnd: f.coachingStart && f.coachingEnd ? shiftDay(f.coachingEnd, f.coachingStart, f.firstPaymentDate) : f.coachingEnd,
+                        revokeDate: f.coachingStart && f.revokeDate ? shiftDay(f.revokeDate, f.coachingStart, f.firstPaymentDate) : f.revokeDate,
+                      }))}>
+                      Paid {fmtShort(form.firstPaymentDate)} — use payment date
+                    </button>
+                  )}</div>
                 <div><label className="text-xs text-brand-muted mb-1 block">Coaching End</label>
                   <input type="date" className="input-field !py-2" value={form.coachingEnd} onChange={e => setForm(f => ({ ...f, coachingEnd: e.target.value }))} /></div>
                 <div><label className="text-xs text-brand-muted mb-1 block">Last Session</label>
