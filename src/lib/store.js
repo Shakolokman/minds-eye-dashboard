@@ -623,10 +623,13 @@ const START_PAYMENT_WINDOW_DAYS = 45;
 function firstPaymentDate(client, stripePayments) {
   const start = parseDate(client.coachingStart);
   const from = start ? new Date(start.getTime() - START_PAYMENT_WINDOW_DAYS * 86400000) : null;
+  // A payment more than a week after the start is a later installment (the
+  // first one was paid some other way), not the payment that started coaching.
+  const to = start ? new Date(start.getTime() + 7 * 86400000) : null;
   const days = matchedPayments(client, stripePayments)
     .map(p => p.date)
     .filter(Boolean)
-    .filter(d => !from || parseDate(d) >= from)
+    .filter(d => !from || (parseDate(d) >= from && parseDate(d) <= to))
     .sort();
   return days[0] || null;
 }
