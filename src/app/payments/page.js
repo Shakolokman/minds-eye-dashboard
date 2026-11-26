@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, addWireTransfer, deleteWireTransfer, deleteEntry, getStripePayments, getDateRange, filterByDateRange, matchStripeToClosers, findMismatches, calculateMetrics } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, addWireTransfer, deleteWireTransfer, deleteEntry, getStripePayments, getDateRange, filterByDateRange, matchStripeToClosers, findMismatches, calculateMetrics, getClients, clientRefundRows, filterByLocalDay } from '@/lib/store';
 
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 
@@ -31,6 +31,7 @@ export default function PaymentsPage() {
   const [entries, setEntries] = useState([]);
   const [wires, setWires] = useState([]);
   const [stripePayments, setStripePayments] = useState([]);
+  const [clientRefunds, setClientRefunds] = useState([]);
   const [preset, setPreset] = useState('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
@@ -54,13 +55,14 @@ export default function PaymentsPage() {
       setEntries(await getEntries());
       setWires(await getWireTransfers());
       setStripePayments(await getStripePayments());
+      setClientRefunds(clientRefundRows(await getClients()));
       setMounted(true);
     }
     load();
   }, []);
 
-  const { filteredEntries, filteredWires, filteredStripe } = useMemo(() => {
-    if (!mounted) return { filteredEntries: [], filteredWires: [], filteredStripe: [] };
+  const { filteredEntries, filteredWires, filteredStripe, filteredRefunds } = useMemo(() => {
+    if (!mounted) return { filteredEntries: [], filteredWires: [], filteredStripe: [], filteredRefunds: [] };
     let start, end;
     if (preset === 'custom' && customStart && customEnd) {
       start = new Date(customStart + 'T00:00:00'); end = new Date(customEnd + 'T23:59:59');
@@ -69,13 +71,14 @@ export default function PaymentsPage() {
       filteredEntries: filterByDateRange(entries, start, end),
       filteredWires: filterByDateRange(wires, start, end),
       filteredStripe: filterByDateRange(stripePayments, start, end),
+      filteredRefunds: filterByLocalDay(clientRefunds, start, end),
     };
-  }, [mounted, entries, wires, stripePayments, preset, customStart, customEnd]);
+  }, [mounted, entries, wires, stripePayments, clientRefunds, preset, customStart, customEnd]);
 
   // Deal revenue from shared calculateMetrics (consistent with dashboard)
-  const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires, filteredStripe), [filteredEntries, filteredWires, filteredStripe]);
+  const metrics = useMemo(() => calculateMetrics(filteredEntries, filteredWires, filteredStripe, clientRefunds, filteredRefunds), [filteredEntries, filteredWires, filteredStripe, clientRefunds, filteredRefunds]);
   const closedDeals = filteredEntries.filter(e => e.formType === 'closer' && e.closed === 'yes');
-  const totalRevenue = metrics.totalRevenue;
+  const totalRevenue = metrics.totalRevenue - metrics.revenueRefunded;
 
   // Stripe-to-closer email matching
   const stripeCloserMatch = useMemo(() => {
@@ -112,8 +115,9 @@ export default function PaymentsPage() {
   // Stripe auto-imported (actual cash)
   const stripeSucceeded = filteredStripe.filter(p => p.status === 'succeeded');
   const stripeCash = stripeSucceeded.reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-  const stripeRefunds = filteredStripe.filter(p => p.status === 'refunded');
-  const refundTotal = stripeRefunds.reduce((s, p) => s + Math.abs(parseFloat(p.amount) || 0), 0);
+  // Refunds come from the Clients page (same source as Dashboard and Clients)
+  const stripeRefunds = filteredRefunds;
+  const refundTotal = filteredRefunds.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
 
   // Wire transfers (actual cash)
   const wireCash = filteredWires.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0);
