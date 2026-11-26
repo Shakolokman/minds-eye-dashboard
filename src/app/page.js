@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie } from 'recharts';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, getStripePayments, getClients, clientRefundRows, filterByLocalDay, calculateNetCash, refundedRevenue, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, entryRevenue, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, getStripePayments, getClients, clientRefundRows, filterByLocalDay, calculateNetCash, refundedRevenue, refundedDeals, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, entryRevenue, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
 
 const fmt = (n) => typeof n === 'number' ? (n >= 1000 ? `${(n/1000).toFixed(1)}k` : n % 1 === 0 ? n.toString() : n.toFixed(1)) : '0';
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -326,7 +326,7 @@ export default function Dashboard() {
                 const noShows = memberEntries.filter(e => e.showUp === 'noshow').length;
                 const showRate = onCal > 0 ? (live / onCal * 100) : 0;
                 const closed = memberEntries.filter(e => e.closed === 'yes');
-                const closedCount = closed.length;
+                const closedCount = closed.length - refundedDeals(closed, clientRefunds).length;
                 const closeRate = live > 0 ? (closedCount / live * 100) : 0;
                 const rev = closed.reduce((s, e) => s + entryRevenue(e, filteredStripe), 0) - refundedRevenue(closed, clientRefunds, filteredStripe);
                 const wireCash = closed.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
