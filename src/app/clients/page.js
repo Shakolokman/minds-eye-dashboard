@@ -70,8 +70,10 @@ export default function ClientsPage() {
   const monthCash = useMemo(() => {
     const { start, end } = getDateRange('month');
     const stripeInRange = filterByDateRange(stripePayments, start, end);
-    const metrics = calculateMetrics(filterByDateRange(entries, start, end), filterByDateRange(wires, start, end), stripeInRange);
-    return calculateNetCash(metrics.allCashTotal, stripeInRange, filterByLocalDay(clientRefundRows(clients), start, end));
+    const allRefunds = clientRefundRows(clients);
+    const refundsInRange = filterByLocalDay(allRefunds, start, end);
+    const metrics = calculateMetrics(filterByDateRange(entries, start, end), filterByDateRange(wires, start, end), stripeInRange, allRefunds, refundsInRange);
+    return { ...calculateNetCash(metrics.grossCashTotal, stripeInRange, refundsInRange), revenue: metrics.totalRevenueWithLT, revenueRefunded: metrics.revenueRefunded };
   }, [clients, stripePayments, entries, wires]);
   const activeRows = useMemo(() => dash.rows.filter(r => !r.refunded).sort(byNewest), [dash.rows]);
   const pastRows = useMemo(
@@ -231,7 +233,7 @@ export default function ClientsPage() {
         <StatCard label="Ending in 14 Days" value={dash.endingIn14} icon="⏳" kpiColor={dash.endingIn14 > 0 ? 'orange' : undefined} />
         <StatCard label="Revoke This Week" value={dash.revokeThisWeek} icon="🚫" kpiColor={dash.revokeThisWeek > 0 ? 'red' : undefined} />
         <StatCard label="Overdue Payments" value={dash.overduePayments} icon="💸" kpiColor={dash.overduePayments > 0 ? 'red' : undefined} />
-        <StatCard label="Active Revenue" value={fmtUSD(dash.activeRevenue)} icon="💰" highlight />
+        <StatCard label="Revenue This Month" value={fmtUSD(monthCash.revenue)} icon="💰" highlight subtitle={monthCash.revenueRefunded > 0 ? `After ${fmtUSD(monthCash.revenueRefunded)} refunded` : undefined} />
         <StatCard label="Refunds" value={fmtUSD(dash.refundTotal)} icon="↩️" subtitle={`${dash.refundList.length} client${dash.refundList.length === 1 ? '' : 's'}`} />
         <StatCard label="Net Cash This Month (Before Fees)" value={fmtUSD(monthCash.netCash)} icon="💵" subtitle={`Cash collected minus ${fmtUSD(monthCash.refundTotal)} refunds`} />
         <StatCard label="Net Cash This Month (After Fees)" value={fmtUSD(monthCash.netCashAfterFees)} highlight icon="🏦" subtitle={`After ${fmtUSD(monthCash.processorFees)} FanBasis/Stripe fees`} />
