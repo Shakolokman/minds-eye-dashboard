@@ -323,7 +323,8 @@ async function getStripePayments() {
       planName: row.plan_name,
       status: row.status,
       stripeEvent: row.stripe_event,
-      date: row.created_at?.split('T')[0],
+      // Payment day in Dubai time (UTC+4), same as Commas
+      date: row.created_at ? new Date(Date.parse(row.created_at) + 4 * 3600 * 1000).toISOString().split('T')[0] : undefined,
       timestamp: row.created_at,
     }));
   } catch (err) {
