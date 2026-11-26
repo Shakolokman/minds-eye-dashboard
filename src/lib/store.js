@@ -974,6 +974,21 @@ function filterByLocalDay(rows, start, end) {
 // Revenue taken off for refunded clients: each closed deal in range that
 // matches a refunded client (by lead email, else lead name) loses the refund
 // amount, capped at that deal's revenue. allRefunds = clientRefundRows (all time).
+// Closed deals whose client was refunded (same matching as refundedRevenue).
+function refundedDeals(closedDeals, allRefunds = []) {
+  const norm = v => (v || '').toLowerCase().trim();
+  const used = new Set();
+  return closedDeals.filter(e => {
+    const em = norm(e.leadEmail), nm = norm(e.leadName);
+    const i = allRefunds.findIndex((r, j) => !used.has(j) && (
+      (em && (norm(r.email) === em || (r.paymentEmails || []).some(x => norm(x) === em))) ||
+      (!em && nm && norm(r.name) === nm)));
+    if (i < 0) return false;
+    used.add(i);
+    return true;
+  });
+}
+
 function refundedRevenue(closedDeals, allRefunds = [], stripePayments = []) {
   const norm = v => (v || '').toLowerCase().trim();
   let total = 0;
@@ -1022,7 +1037,8 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = [], allR
   const closerOnCalendar = closerEntries.filter(e => e.showUp === 'live' || e.showUp === 'noshow').length;
   const closerShowUpRate = closerOnCalendar > 0 ? (closerLiveCalls / closerOnCalendar * 100) : 0;
   const closedDeals = closerEntries.filter(e => e.closed === 'yes');
-  const totalClosed = closedDeals.length;
+  // Refunded deals don't count as closed
+  const totalClosed = closedDeals.length - refundedDeals(closedDeals, allRefunds).length;
   const closeRate = closerLiveCalls > 0 ? (totalClosed / closerLiveCalls * 100) : 0;
 
   const totalRevenue = closedDeals.reduce((s, e) => s + entryRevenue(e, stripePayments), 0);
@@ -1132,6 +1148,6 @@ export {
   getClients, addClient, updateClient, deleteClient,
   computeClientDerived, calculateClientDashboard, buildNotifications,
   filterByDateRange, getDateRange, calculateMetrics, entryRevenue,
-  processorFee, calculateNetCash, refundedRevenue, clientRefundRows, filterByLocalDay,
+  processorFee, calculateNetCash, refundedRevenue, refundedDeals, clientRefundRows, filterByLocalDay,
   firstPaymentDate, shiftDay,
 };
