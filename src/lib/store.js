@@ -1000,7 +1000,8 @@ function refundedRevenue(closedDeals, allRefunds = [], stripePayments = []) {
       (!em && nm && norm(r.name) === nm)));
     if (!r) return;
     used.add(allRefunds.indexOf(r));
-    total += Math.min(r.amount, entryRevenue(e, stripePayments));
+    // A refunded client's whole deal comes off revenue (not just the refunded cash)
+    total += entryRevenue(e, stripePayments);
   });
   return total;
 }
