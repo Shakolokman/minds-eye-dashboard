@@ -959,7 +959,7 @@ function calculateNetCash(cashCollected, stripeInRange = [], refundsInRange = []
 function clientRefundRows(clients) {
   return clients
     .filter(c => (parseFloat(c.refundAmount) || 0) > 0)
-    .map(c => ({ name: c.name, amount: parseFloat(c.refundAmount) || 0, date: c.refundDate }));
+    .map(c => ({ name: c.name, email: c.email || '', paymentEmails: c.paymentEmails || [], amount: parseFloat(c.refundAmount) || 0, date: c.refundDate }));
 }
 
 // Keep rows whose plain YYYY-MM-DD date falls in [start, end] (local time).
@@ -970,7 +970,26 @@ function filterByLocalDay(rows, start, end) {
   });
 }
 
-function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
+// Revenue taken off for refunded clients: each closed deal in range that
+// matches a refunded client (by lead email, else lead name) loses the refund
+// amount, capped at that deal's revenue. allRefunds = clientRefundRows (all time).
+function refundedRevenue(closedDeals, allRefunds = [], stripePayments = []) {
+  const norm = v => (v || '').toLowerCase().trim();
+  let total = 0;
+  const used = new Set();
+  closedDeals.forEach(e => {
+    const em = norm(e.leadEmail), nm = norm(e.leadName);
+    const r = allRefunds.find((r, i) => !used.has(i) && (
+      (em && (norm(r.email) === em || (r.paymentEmails || []).some(x => norm(x) === em))) ||
+      (!em && nm && norm(r.name) === nm)));
+    if (!r) return;
+    used.add(allRefunds.indexOf(r));
+    total += Math.min(r.amount, entryRevenue(e, stripePayments));
+  });
+  return total;
+}
+
+function calculateMetrics(entries, wireTransfers = [], stripePayments = [], allRefunds = [], refundsInRange = []) {
   const setterEntries = entries.filter(e => e.formType === 'setter');
   const outboundEntries = entries.filter(e => e.formType === 'outbound');
   const triageEntries = entries.filter(e => e.formType === 'triage' || e.formType === 'triager');
@@ -1019,9 +1038,13 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
   const lowTicketRevenue = stripePayments
     .filter(p => p.status === 'succeeded' && (parseFloat(p.amount) || 0) < 100)
     .reduce((s, p) => s + (parseFloat(p.amount) || 0), 0);
-  const totalRevenueWithLT = totalRevenue + lowTicketRevenue;
+  const revenueRefunded = refundedRevenue(closedDeals, allRefunds, stripePayments);
+  const totalRevenueWithLT = totalRevenue + lowTicketRevenue - revenueRefunded;
   const totalCashWithWire = totalCashCollected + wireCash;
-  const allCashTotal = totalCashWithWire + stripeCashTotal;
+  const grossCashTotal = totalCashWithWire + stripeCashTotal;
+  const cashRefunded = refundsInRange.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+  // Cash Collected is shown net of client refunds dated in range.
+  const allCashTotal = grossCashTotal - cashRefunded;
   const avgCashPerClose = totalClosed > 0 ? allCashTotal / totalClosed : 0;
   const avgRevPerClose = totalClosed > 0 ? totalRevenueWithLT / totalClosed : 0;
   const cashToRevPercent = totalRevenueWithLT > 0 ? (allCashTotal / totalRevenueWithLT * 100) : 0;
@@ -1082,7 +1105,7 @@ function calculateMetrics(entries, wireTransfers = [], stripePayments = []) {
     replyRate, allShowUpRate,
     triageOnCalendar, triageLiveCalls, triageNoShows, triageShowUpRate, triageQualified, triageBookedSC,
     closerOnCalendar, closerLiveCalls, closerNoShows, closerShowUpRate,
-    totalClosed, closeRate, totalRevenue, totalRevenueWithLT, lowTicketRevenue, totalCashCollected, wireCash, stripeCashTotal, totalCashWithWire, allCashTotal,
+    totalClosed, closeRate, totalRevenue, totalRevenueWithLT, lowTicketRevenue, totalCashCollected, wireCash, stripeCashTotal, totalCashWithWire, allCashTotal, grossCashTotal, cashRefunded, revenueRefunded,
     avgCashPerClose, avgRevPerClose, cashToRevPercent,
     pifDeals, splitDeals, depositDeals,
     dmToLinkCR, linkToBookedCR, tcToScCR,
