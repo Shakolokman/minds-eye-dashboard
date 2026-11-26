@@ -13,7 +13,7 @@ const CHART_GOLD = '#E1C36E';
 const CHART_COLORS = ['#E1C36E', '#6EE1A8', '#A86EE1', '#E16E8A', '#6EA8E1'];
 
 export default function Dashboard() {
-  const [preset, setPreset] = useState('today');
+  const [preset, setPreset] = useState('month');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [team, setTeam] = useState([]);
