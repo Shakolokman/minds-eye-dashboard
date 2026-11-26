@@ -1131,6 +1131,6 @@ export {
   getClients, addClient, updateClient, deleteClient,
   computeClientDerived, calculateClientDashboard, buildNotifications,
   filterByDateRange, getDateRange, calculateMetrics, entryRevenue,
-  processorFee, calculateNetCash, clientRefundRows, filterByLocalDay,
+  processorFee, calculateNetCash, refundedRevenue, clientRefundRows, filterByLocalDay,
   firstPaymentDate, shiftDay,
 };
