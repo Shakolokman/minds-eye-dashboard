@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, FunnelChart, Funnel, LabelList, Cell, PieChart, Pie } from 'recharts';
 import DateFilter from '@/components/DateFilter';
 import StatCard from '@/components/StatCard';
-import { getTeam, getEntries, getWireTransfers, getStripePayments, getClients, clientRefundRows, filterByLocalDay, calculateNetCash, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, entryRevenue, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
+import { getTeam, getEntries, getWireTransfers, getStripePayments, getClients, clientRefundRows, filterByLocalDay, calculateNetCash, refundedRevenue, getDateRange, filterByDateRange, calculateMetrics, matchStripeToClosers, findMismatches, entryRevenue, ROLE_LABELS, WEEKLY_KPIS, DAILY_KPIS, getKpiColor } from '@/lib/store';
 
 const fmt = (n) => typeof n === 'number' ? (n >= 1000 ? `${(n/1000).toFixed(1)}k` : n % 1 === 0 ? n.toString() : n.toFixed(1)) : '0';
 const fmtUSD = (n) => `$${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -328,10 +328,17 @@ export default function Dashboard() {
                 const closed = memberEntries.filter(e => e.closed === 'yes');
                 const closedCount = closed.length;
                 const closeRate = live > 0 ? (closedCount / live * 100) : 0;
-                const rev = closed.reduce((s, e) => s + entryRevenue(e, filteredStripe), 0);
+                const rev = closed.reduce((s, e) => s + entryRevenue(e, filteredStripe), 0) - refundedRevenue(closed, clientRefunds, filteredStripe);
                 const wireCash = closed.reduce((s, e) => s + (parseFloat(e.cashCollected) || 0), 0);
                 const stripeCash = closerStripeCash[member.id] || 0;
-                const totalCash = wireCash + stripeCash;
+                // Refunds dated in range for clients this closer closed (any date)
+                const norm = v => (v || '').toLowerCase().trim();
+                const myDeals = allEntries.filter(e => e.memberId === member.id && e.formType === 'closer' && e.closed === 'yes');
+                const myRefunds = filteredRefunds.filter(r => myDeals.some(e =>
+                  (norm(e.leadEmail) && (norm(e.leadEmail) === norm(r.email) || (r.paymentEmails || []).some(x => norm(x) === norm(e.leadEmail)))) ||
+                  (!norm(e.leadEmail) && norm(e.leadName) && norm(e.leadName) === norm(r.name))));
+                const memberRefund = myRefunds.reduce((s, r) => s + r.amount, 0);
+                const totalCash = wireCash + stripeCash - memberRefund;
                 const pif = closed.filter(e => e.paymentType === 'pif' || (e.paymentDetails || '').toLowerCase().includes('pif')).length;
                 const split = closed.filter(e => e.paymentType === 'split' || (e.paymentDetails || '').toLowerCase().includes('split')).length;
                 const deposit = closed.filter(e => (e.paymentDetails || '').toLowerCase().includes('deposit')).length;
